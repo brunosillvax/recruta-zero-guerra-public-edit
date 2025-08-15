@@ -1,6 +1,27 @@
 // Versão
-const VERSION = "war-public-v5.0.0-online";
+const VERSION = "war-public-v5.1.0-online"; // Corrigido carregamento de script
 document.getElementById("version").textContent = VERSION;
+
+// Importa as funções necessárias dos SDKs do Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+// A configuração do seu app web Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDYUtq1zxXleJDWd-XoCkx5GUKTuAaPcLk",
+  authDomain: "recruta-zero.firebaseapp.com",
+  projectId: "recruta-zero",
+  storageBucket: "recruta-zero.appspot.com",
+  messagingSenderId: "758953044147",
+  appId: "1:758953044147:web:9b5562b4d45e4faaaf28c6"
+};
+
+// Inicializa o Firebase e o Firestore
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+
+// --- O RESTANTE DO CÓDIGO PERMANECE O MESMO ---
 
 // ÍCONES SVG PROFISSIONAIS
 const ICONS = {
@@ -14,10 +35,7 @@ const PIN = "1590";
 // Helpers
 const $ = (s, el = document) => el.querySelector(s);
 
-// Acessa as funções do Firebase que foram colocadas no objeto window
-const { db, collection, onSnapshot, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } = window.firebase;
-
-// Estado local (agora só guarda os dados temporariamente, a fonte da verdade é o Firebase)
+// Estado local
 let state = {
   settings: { maxPlayers: 50, totalDays: 4 },
   players: [],
@@ -32,9 +50,8 @@ onSnapshot(settingsRef, (docSnap) => {
     if (docSnap.exists()) {
         state.settings = docSnap.data();
         initSettingsInputs();
-        render(); // Re-renderiza a tabela caso o número de dias mude
+        render();
     } else {
-        // Se não existir, cria o documento de configurações com os valores padrão
         setDoc(settingsRef, state.settings);
     }
 });
@@ -46,9 +63,8 @@ onSnapshot(playersRef, (querySnapshot) => {
         playersFromDB.push({ id: doc.id, ...doc.data() });
     });
     state.players = playersFromDB;
-    render(); // A mágica acontece aqui: sempre que os dados mudam, a tela atualiza
+    render();
 });
-
 
 // --- Event Listeners Globais ---
 $("#search").addEventListener("input", render);
@@ -90,7 +106,7 @@ async function addPlayer() {
   dailyPoints[0] = points;
   
   const newPlayer = { name: name.trim(), dailyPoints };
-  await addDoc(playersRef, newPlayer); // Salva no Firebase
+  await addDoc(playersRef, newPlayer);
 }
 
 async function handleTableClick(e) {
@@ -185,6 +201,8 @@ async function saveSettings() {
   const newTotalDays = clamp(parseInt($("#totalDaysInput").value || "4", 10), 1, 10);
   const newMaxPlayers = clamp(parseInt($("#maxPlayersInput").value || "50", 10), 5, 200);
 
+  const newSettings = { totalDays: newTotalDays, maxPlayers: newMaxPlayers };
+
   if (newTotalDays !== state.settings.totalDays) {
       const batch = writeBatch(db);
       state.players.forEach(p => {
@@ -196,7 +214,7 @@ async function saveSettings() {
       await batch.commit();
   }
   
-  await setDoc(settingsRef, { totalDays: newTotalDays, maxPlayers: newMaxPlayers });
+  await setDoc(settingsRef, newSettings);
   showAlert({ title: 'Sucesso', message: 'Configurações salvas.' });
 }
 
