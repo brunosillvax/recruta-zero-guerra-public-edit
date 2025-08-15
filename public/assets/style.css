@@ -26,21 +26,15 @@ body { margin: 0; background: linear-gradient(to bottom, #1e293b, #0f172a); font
 .table .col-total-header { background-color: rgba(56, 189, 248, 0.1); }
 .table .col-total-cell { background-color: rgba(56, 189, 248, 0.05); }
 
-/* ===== Cores Ranking ===== */
-#rankingBody .gold { background: linear-gradient(90deg,#FFD700,#FFC107); color: #111827; font-weight: 700; }
-#rankingBody .silver { background: linear-gradient(90deg,#C0C0C0,#D6DFEC); color: #111827; font-weight: 700; }
-#rankingBody .bronze { background: linear-gradient(90deg,#CD7F32,#B87333); color: #111827; font-weight: 700; }
+/* ===== Cores Ranking (NOVAS CORES MAIS VIBRANTES) ===== */
+#rankingBody .gold { background: linear-gradient(135deg, #ffd700, #ffb300); color: #1f2937; font-weight: 700; }
+#rankingBody .silver { background: linear-gradient(135deg, #e0e0e0, #b0bec5); color: #1f2937; font-weight: 700; }
+#rankingBody .bronze { background: linear-gradient(135deg, #cd7f32, #a1662e); color: #f0f9ff; font-weight: 700; }
 #rankingBody tr:not(.gold):not(.silver):not(.bronze):nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
 
 /* ===== Helpers e Ícones ===== */
 .cell-numeric { text-align: center; font-weight: 500; white-space: nowrap; }
-/* MUDANÇA AQUI: Adicionado alinhamento e espaçamento à direita para a célula Total */
-.cell-total {
-  font-weight: 700;
-  color: #f0f9ff;
-  text-align: right;
-  padding-right: 1.25rem; /* 20px */
-}
+.cell-total { font-weight: 700; color: #f0f9ff; text-align: right; padding-right: 1.25rem; }
 .icon { width: 1rem; height: 1rem; color: #94a3b8; }
 .icon-danger { color: #f87171; }
 
