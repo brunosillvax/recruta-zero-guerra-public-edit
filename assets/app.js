@@ -1,5 +1,5 @@
 // Versão
-const VERSION = "war-public-v4.2.0"; // Ajuste Fino de Layout
+const VERSION = "war-v4.2.0"; // Ajuste Fino de Layout
 document.getElementById("version").textContent = VERSION;
 
 // ÍCONES SVG PROFISSIONAIS
