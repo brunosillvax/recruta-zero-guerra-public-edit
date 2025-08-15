@@ -1,5 +1,5 @@
 // Versão
-const VERSION = "war-v4.2.0"; // Ajuste Fino de Layout
+const VERSION = "war-public-v5.0.0-online";
 document.getElementById("version").textContent = VERSION;
 
 // ÍCONES SVG PROFISSIONAIS
@@ -14,14 +14,41 @@ const PIN = "1590";
 // Helpers
 const $ = (s, el = document) => el.querySelector(s);
 
-// Estado Padrão
-const defaultState = {
-  version: VERSION,
+// Acessa as funções do Firebase que foram colocadas no objeto window
+const { db, collection, onSnapshot, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } = window.firebase;
+
+// Estado local (agora só guarda os dados temporariamente, a fonte da verdade é o Firebase)
+let state = {
   settings: { maxPlayers: 50, totalDays: 4 },
   players: [],
 };
-let state = load() || defaultState;
-save();
+
+// --- Referências do Firestore ---
+const settingsRef = doc(db, "config", "settings");
+const playersRef = collection(db, "players");
+
+// --- Listener em Tempo Real para as Configurações ---
+onSnapshot(settingsRef, (docSnap) => {
+    if (docSnap.exists()) {
+        state.settings = docSnap.data();
+        initSettingsInputs();
+        render(); // Re-renderiza a tabela caso o número de dias mude
+    } else {
+        // Se não existir, cria o documento de configurações com os valores padrão
+        setDoc(settingsRef, state.settings);
+    }
+});
+
+// --- Listener em Tempo Real para os Jogadores ---
+onSnapshot(playersRef, (querySnapshot) => {
+    const playersFromDB = [];
+    querySnapshot.forEach((doc) => {
+        playersFromDB.push({ id: doc.id, ...doc.data() });
+    });
+    state.players = playersFromDB;
+    render(); // A mágica acontece aqui: sempre que os dados mudam, a tela atualiza
+});
+
 
 // --- Event Listeners Globais ---
 $("#search").addEventListener("input", render);
@@ -46,20 +73,8 @@ document.addEventListener('click', (e) => {
 // --- Lógica do Painel de Configuração ---
 $("#saveSettings").addEventListener("click", saveSettings);
 $("#resetPointsBtn").addEventListener("click", resetAllPoints);
-initSettingsInputs();
 
 // --- FUNÇÕES PRINCIPAIS ---
-function load() {
-  try {
-    const loadedState = JSON.parse(localStorage.getItem("rz_war_state"));
-    if (!loadedState || !loadedState.version) {
-      if (loadedState) showAlert({ title: "Atualização", message: "A estrutura de dados foi atualizada. Os dados antigos foram reiniciados." });
-      return null;
-    }
-    return loadedState;
-  } catch (e) { return null; }
-}
-
 function render() {
   renderTable();
 }
@@ -71,16 +86,11 @@ async function addPlayer() {
   const pointsStr = await showPrompt({ title: 'Pontos Iniciais', message: `Quais os pontos para o Dia 1 de ${name}?`, type: 'number', initialValue: '0' });
   const points = Number.isFinite(parseInt(pointsStr, 10)) ? parseInt(pointsStr, 10) : 0;
   
-  const newPlayer = {
-      id: uid(),
-      name: name.trim(),
-      dailyPoints: Array(state.settings.totalDays).fill(0)
-  };
-  newPlayer.dailyPoints[0] = points;
+  const dailyPoints = Array(state.settings.totalDays).fill(0);
+  dailyPoints[0] = points;
   
-  state.players.push(newPlayer);
-  save();
-  renderTable({ animateNewId: newPlayer.id });
+  const newPlayer = { name: name.trim(), dailyPoints };
+  await addDoc(playersRef, newPlayer); // Salva no Firebase
 }
 
 async function handleTableClick(e) {
@@ -90,39 +100,41 @@ async function handleTableClick(e) {
     if (!id || !action) return;
     const player = state.players.find(p => p.id === id);
     if (!player) return;
-    let needsRender = true;
+
+    const playerDocRef = doc(db, "players", id);
+
     if (action === 'edit-name') {
         const newName = await showPrompt({ title: 'Editar Nome', message: `Qual o novo nome para ${player.name}?`, initialValue: player.name });
-        if (newName !== null) { player.name = newName.trim() || player.name; }
+        if (newName !== null) {
+            await updateDoc(playerDocRef, { name: newName.trim() || player.name });
+        }
     } else if (action === 'edit-points') {
         const dayNum = parseInt(dayIndex, 10) + 1;
         const newPointsStr = await showPrompt({ title: `Editar Pontos - Dia ${dayNum}`, message: `Novos pontos para ${player.name}:`, type: 'number', initialValue: player.dailyPoints[dayIndex] });
         const newPoints = parseInt(newPointsStr, 10);
-        if (Number.isFinite(newPoints)) { player.dailyPoints[dayIndex] = newPoints; }
+        if (Number.isFinite(newPoints)) {
+            const updatedPoints = [...player.dailyPoints];
+            updatedPoints[dayIndex] = newPoints;
+            await updateDoc(playerDocRef, { dailyPoints: updatedPoints });
+        }
     } else if (action === 'remove') {
         const confirmed = await showConfirm({ title: 'Remover Jogador', message: `Tem certeza que deseja remover ${player.name}?` });
         if (confirmed) {
-            const row = target.closest('tr');
-            row.classList.add('row-exiting');
-            row.addEventListener('animationend', () => {
-                state.players = state.players.filter(p => p.id !== id);
-                save();
-                render();
-            }, { once: true });
-            needsRender = false;
-        } else {
-            needsRender = false;
+            await deleteDoc(playerDocRef);
         }
     }
-    if (needsRender) { save(); render(); }
 }
 
 async function resetAllPoints() {
     const confirmed = await showConfirm({ title: 'Resetar Pontos', message: 'ATENÇÃO! Deseja ZERAR TODOS OS PONTOS de todos os jogadores?', confirmText: 'Sim, Zerar Tudo' });
     if (confirmed) {
-        state.players.forEach(p => { p.dailyPoints.fill(0); });
-        save();
-        render();
+        const batch = writeBatch(db);
+        state.players.forEach(player => {
+            const playerDocRef = doc(db, "players", player.id);
+            const resetPoints = Array(state.settings.totalDays).fill(0);
+            batch.update(playerDocRef, { dailyPoints: resetPoints });
+        });
+        await batch.commit();
         showAlert({ title: 'Sucesso', message: 'Todos os pontos foram resetados.' });
     }
 }
@@ -130,7 +142,7 @@ async function resetAllPoints() {
 // --- Funções de Renderização ---
 const formatNumber = (num) => (num || 0).toLocaleString('pt-BR');
 
-function renderTable({ animateNewId = null } = {}) {
+function renderTable() {
   const wrapper = $("#tableWrapper");
   const q = ($("#search").value || "").toLowerCase();
   
@@ -143,11 +155,9 @@ function renderTable({ animateNewId = null } = {}) {
   const rows = filtered.map((p, i) => {
     const total = getTotalPoints(p);
     const dailyCells = p.dailyPoints.map((score, dayIdx) => `<td class="cell-numeric"><button data-id="${p.id}" data-action="edit-points" data-day-index="${dayIdx}" class="w-full h-full text-center">${formatNumber(score)}</button></td>`).join("");
-    const animationClass = p.id === animateNewId ? 'row-entering' : '';
-    return `<tr class="${animationClass}" data-player-id="${p.id}"><td class="cell-numeric">${i + 1}</td><td class="align-left"><button data-id="${p.id}" data-action="edit-name" class="flex items-center gap-2 w-full text-left">${ICONS.edit}<span class="flex-grow min-w-0 truncate">${escapeHtml(p.name)}</span></button></td>${dailyCells}<td class="cell-numeric cell-total col-total-cell">${formatNumber(total)}</td><td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td></tr>`;
+    return `<tr data-player-id="${p.id}"><td class="cell-numeric">${i + 1}</td><td class="align-left"><button data-id="${p.id}" data-action="edit-name" class="flex items-center gap-2 w-full text-left">${ICONS.edit}<span class="flex-grow min-w-0 truncate">${escapeHtml(p.name)}</span></button></td>${dailyCells}<td class="cell-numeric cell-total col-total-cell">${formatNumber(total)}</td><td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td></tr>`;
   }).join("");
 
-  // MUDANÇA AQUI: Adicionada a classe "cell-total" ao cabeçalho
   wrapper.innerHTML = `<table class="table"><thead><tr><th class="w-6">#</th><th>Jogador</th>${dayHeaders}<th class="w-14 col-total-header cell-total">Total</th><th class="w-10"></th></tr></thead><tbody id="player-tbody">${rows}</tbody></table>`;
   
   const grandTotal = state.players.reduce((sum, p) => sum + getTotalPoints(p), 0);
@@ -171,20 +181,23 @@ function renderRanking(list) {
 }
 
 // --- Funções Utilitárias ---
-function saveSettings() {
+async function saveSettings() {
   const newTotalDays = clamp(parseInt($("#totalDaysInput").value || "4", 10), 1, 10);
+  const newMaxPlayers = clamp(parseInt($("#maxPlayersInput").value || "50", 10), 5, 200);
+
   if (newTotalDays !== state.settings.totalDays) {
+      const batch = writeBatch(db);
       state.players.forEach(p => {
+          const playerDocRef = doc(db, "players", p.id);
           const newPoints = Array(newTotalDays).fill(0);
           p.dailyPoints.slice(0, newTotalDays).forEach((score, i) => newPoints[i] = score);
-          p.dailyPoints = newPoints;
+          batch.update(playerDocRef, { dailyPoints: newPoints });
       });
+      await batch.commit();
   }
-  state.settings.totalDays = newTotalDays;
-  state.settings.maxPlayers = clamp(parseInt($("#maxPlayersInput").value || "50", 10), 5, 200);
-  save();
+  
+  await setDoc(settingsRef, { totalDays: newTotalDays, maxPlayers: newMaxPlayers });
   showAlert({ title: 'Sucesso', message: 'Configurações salvas.' });
-  render();
 }
 
 function initSettingsInputs() {
@@ -194,16 +207,15 @@ function initSettingsInputs() {
 
 function tickClock() {
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
+  const dateStr = now.toLocaleDateString('pt-BR');
   const timeStr = now.toTimeString().slice(0, 5);
-  $("#dateDisplay").textContent = dateStr.split("-").reverse().join("/");
+  $("#dateDisplay").textContent = dateStr;
   $("#timeDisplay").textContent = timeStr;
 }
 
-function save() { localStorage.setItem("rz_war_state", JSON.stringify(state)); }
 function uid() { return Math.random().toString(36).slice(2, 9); }
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
-function escapeHtml(s) { return s?.replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])) || ""; }
+function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
 // --- Sistema de Modais Customizado ---
 const dialogModal = $("#dialogModal");
@@ -257,6 +269,3 @@ async function showPrompt({ title, message, initialValue = '', type = 'text' }) 
     const safeInitialValue = String(initialValue || '');
     return showDialog({ title, body: `<label class="text-sm text-slate-300">${message}</label><input type="${type}" id="dialogInput" class="input mt-2" value="${escapeHtml(safeInitialValue)}">`, buttons: [{ text: 'Cancelar', class: 'btn-sec', value: null }, { text: 'OK', class: 'btn' }] });
 }
-
-// Inicializa a aplicação
-render();

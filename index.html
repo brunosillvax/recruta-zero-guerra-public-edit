@@ -7,20 +7,23 @@
   <meta name="theme-color" content="#0f172a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.8em%22 font-size=%2280%22>⚔️</text></svg>">
 
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS custom -->
   <link rel="stylesheet" href="./assets/style.css">
 </head>
 <body class="bg-slate-900 text-slate-100">
 
 <main class="max-w-md mx-auto min-h-screen px-3 pb-28">
 
+  <!-- Header -->
   <header class="sticky top-0 z-30 backdrop-blur bg-slate-900/70">
     <div class="flex items-center justify-between py-3">
       <div class="flex items-center gap-2">
         <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-yellow-400 grid place-items-center shadow-lg">⚔️</div>
         <div>
           <h1 class="text-lg font-black leading-tight">RECRUTA ZERO《☆》</h1>
-          <p class="text-xs text-slate-300">Placar da Guerra</p>
+          <p class="text-xs text-slate-300">Placar da Guerra Online</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -30,6 +33,7 @@
     </div>
   </header>
 
+  <!-- Info Bar -->
   <section class="card mt-2 space-y-2">
     <div class="flex items-center justify-between gap-2 text-sm">
       <div>📅 <b>Data:</b> <span id="dateDisplay"></span></div>
@@ -46,53 +50,60 @@
     <div class="text-sm">📊 <b>Total Geral:</b> <span id="totalPoints">0</span></div>
   </section>
 
+  <!-- Tabela Principal -->
   <section class="card mt-2">
     <div id="tableWrapper" class="table-wrapper"></div>
   </section>
 
+  <!-- Footer -->
   <footer class="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur border-t border-slate-800">
     <div class="max-w-md mx-auto p-3 text-center text-xs text-slate-400">
-      RECRUTA ZERO <span id="version"></span>
+      Placar Online • Versão <span id="version"></span>
     </div>
   </footer>
 </main>
 
-<div id="rankingModal" class="modal-backdrop">
-  <div class="modal-content card modal-lg">
-    <div class="flex justify-between items-center mb-4">
-      <div><h2 class="text-lg font-bold">🏆 Tabela de Ranking</h2><p class="text-xs text-slate-400">Classificação Geral (Total Acumulado)</p></div>
-      <button data-close-modal="rankingModal" class="modal-close-btn">&times;</button>
-    </div>
-    <div class="table-wrapper max-h-96 overflow-y-auto">
-      <table class="w-full text-white text-sm"><thead class="sticky top-0 bg-slate-800 uppercase text-xs"><tr><th class="p-2 text-center">Pos.</th><th class="p-2 text-left">Jogador</th><th class="p-2 cell-numeric">Total</th></tr></thead><tbody id="rankingBody"></tbody></table>
-    </div>
-  </div>
-</div>
+<!-- Modais (sem alteração na estrutura) -->
+<div id="rankingModal" class="modal-backdrop"><div class="modal-content card modal-lg"><div class="flex justify-between items-center mb-4"><div><h2 class="text-lg font-bold">🏆 Tabela de Ranking</h2><p class="text-xs text-slate-400">Classificação Geral (Total Acumulado)</p></div><button data-close-modal="rankingModal" class="modal-close-btn">&times;</button></div><div class="table-wrapper max-h-96 overflow-y-auto"><table class="w-full text-white text-sm"><thead class="sticky top-0 bg-slate-800 uppercase text-xs"><tr><th class="p-2 text-center">Pos.</th><th class="p-2 text-left">Jogador</th><th class="p-2 cell-numeric">Total</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div></div>
+<div id="settingsModal" class="modal-backdrop"><div class="modal-content card"><div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold">⚙️ Configurações</h2><button data-close-modal="settingsModal" class="modal-close-btn">&times;</button></div><div class="space-y-3 text-sm"><div class="flex items-center justify-between gap-2"><label for="totalDaysInput">Duração da Guerra (dias)</label><input id="totalDaysInput" type="number" min="1" max="10" class="input w-28"></div><div class="flex items-center justify-between gap-2"><label for="maxPlayersInput">Máx. Jogadores</label><input id="maxPlayersInput" type="number" min="5" max="200" class="input w-28"></div><div class="flex items-center justify-end gap-2 mt-2"><button id="saveSettings" class="btn">💾 Salvar</button></div><hr class="border-slate-700 my-3"><div><p class="text-xs text-slate-400 mb-2">Ação perigosa. Cuidado ao usar.</p><button id="resetPointsBtn" class="btn-danger w-full">⚠️ Resetar Pontos</button></div></div></div></div>
+<div id="dialogModal" class="modal-backdrop"><div class="modal-content card w-full max-w-xs"><h2 id="dialogTitle" class="text-lg font-bold mb-2"></h2><div id="dialogBody"></div><div id="dialogFooter" class="flex justify-end gap-2 mt-4"></div></div></div>
 
-<div id="settingsModal" class="modal-backdrop">
-  <div class="modal-content card">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-lg font-bold">⚙️ Configurações</h2>
-      <button data-close-modal="settingsModal" class="modal-close-btn">&times;</button>
-    </div>
-    <div class="space-y-3 text-sm">
-      <div class="flex items-center justify-between gap-2"><label for="totalDaysInput">Duração da Guerra (dias)</label><input id="totalDaysInput" type="number" min="1" max="10" class="input w-28"></div>
-      <div class="flex items-center justify-between gap-2"><label for="maxPlayersInput">Máx. Jogadores</label><input id="maxPlayersInput" type="number" min="5" max="200" class="input w-28"></div>
-      <div class="flex items-center justify-end gap-2 mt-2"><button id="saveSettings" class="btn">💾 Salvar</button></div>
-      <hr class="border-slate-700 my-3">
-      <div><p class="text-xs text-slate-400 mb-2">Ação perigosa. Cuidado ao usar.</p><button id="resetPointsBtn" class="btn-danger w-full">⚠️ Resetar Pontos</button></div>
-    </div>
-  </div>
-</div>
+<!-- SCRIPTS DO FIREBASE -->
+<script type="module">
+  // Importa as funções necessárias dos SDKs
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+  import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-<div id="dialogModal" class="modal-backdrop">
-  <div class="modal-content card w-full max-w-xs">
-    <h2 id="dialogTitle" class="text-lg font-bold mb-2"></h2>
-    <div id="dialogBody"></div>
-    <div id="dialogFooter" class="flex justify-end gap-2 mt-4"></div>
-  </div>
-</div>
+  // A configuração do seu app web Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyDYUtq1zxXleJDWd-XoCkx5GUKTuAaPcLk",
+    authDomain: "recruta-zero.firebaseapp.com",
+    projectId: "recruta-zero",
+    storageBucket: "recruta-zero.appspot.com",
+    messagingSenderId: "758953044147",
+    appId: "1:758953044147:web:9b5562b4d45e4faaaf28c6"
+  };
 
+  // Inicializa o Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Deixa as funções do Firestore disponíveis globalmente para o app.js
+  window.firebase = {
+      db,
+      collection,
+      onSnapshot,
+      doc,
+      getDoc,
+      setDoc,
+      addDoc,
+      updateDoc,
+      deleteDoc,
+      writeBatch
+  };
+</script>
+
+<!-- NOSSO SCRIPT PRINCIPAL -->
 <script src="./assets/app.js"></script>
 </body>
 </html>
