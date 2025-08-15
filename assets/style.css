@@ -1,0 +1,60 @@
+/* ===== Base ===== */
+body { margin: 0; background: linear-gradient(to bottom, #1e293b, #0f172a); font-family: 'Segoe UI', sans-serif; color: #e6eef8; padding: 10px; }
+
+/* ===== Card Base ===== */
+.card { background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148,163,184,0.1); padding: 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-bottom: 12px; }
+
+/* ===== Inputs e Botões ===== */
+.input { background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.2); color: #e6eef8; padding: 10px 12px; border-radius: 10px; width: 100%; box-sizing: border-box; }
+.input:focus { outline: 2px solid #38bdf8; border-color: #38bdf8; }
+.btn { background: linear-gradient(90deg,#0ea5e9,#7c3aed); color: white; padding: 10px 14px; border-radius: 12px; border: none; font-weight: 600; transition: all 0.2s ease; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+.btn-sec { background: rgba(255,255,255,0.05); color: #cbd5e1; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(148,163,184,0.2); font-weight: 600; transition: all 0.2s ease; }
+.btn-sec:hover { background: rgba(255,255,255,0.1); border-color: rgba(148,163,184,0.3); }
+.btn-danger { background-color: transparent; color: #fca5a5; padding: 10px 14px; border-radius: 12px; border: 1px solid #b91c1c; font-weight: 600; transition: all 0.2s ease; }
+.btn-danger:hover { background-color: #b91c1c; color: white; box-shadow: 0 4px 10px rgba(185, 28, 28, 0.4); }
+.header-btn { background-color: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.2); width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; display: grid; place-items: center; transition: all 0.2s; }
+.header-btn:hover { background-color: rgba(255,255,255,0.1); border-color: rgba(148,163,184,0.3); }
+
+/* ===== Tabela ===== */
+.table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; color: #e6eef8; table-layout: auto; }
+.table thead th { background: rgba(15,23,42,0.9); padding: 12px 8px; font-weight: 700; text-align: center; white-space: nowrap; }
+.table tbody td { padding: 10px 8px; border-top: 1px solid rgba(148,163,184,0.1); vertical-align: middle; text-align: center; }
+.table tbody td.align-left { text-align: left; }
+.table tbody tr:hover { background-color: rgba(30,41,59,0.7); }
+.table .col-total-header { background-color: rgba(56, 189, 248, 0.1); }
+.table .col-total-cell { background-color: rgba(56, 189, 248, 0.05); }
+
+/* ===== Cores Ranking ===== */
+#rankingBody .gold { background: linear-gradient(90deg,#FFD700,#FFC107); color: #111827; font-weight: 700; }
+#rankingBody .silver { background: linear-gradient(90deg,#C0C0C0,#D6DFEC); color: #111827; font-weight: 700; }
+#rankingBody .bronze { background: linear-gradient(90deg,#CD7F32,#B87333); color: #111827; font-weight: 700; }
+#rankingBody tr:not(.gold):not(.silver):not(.bronze):nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+
+/* ===== Helpers e Ícones ===== */
+.cell-numeric { text-align: center; font-weight: 500; white-space: nowrap; }
+/* MUDANÇA AQUI: Adicionado alinhamento e espaçamento à direita para a célula Total */
+.cell-total {
+  font-weight: 700;
+  color: #f0f9ff;
+  text-align: right;
+  padding-right: 1.25rem; /* 20px */
+}
+.icon { width: 1rem; height: 1rem; color: #94a3b8; }
+.icon-danger { color: #f87171; }
+
+/* ===== Estilos para Modais ===== */
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+.modal-backdrop.visible { opacity: 1; pointer-events: auto; }
+.modal-content { --tw-scale-x: .95; --tw-scale-y: .95; transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); opacity: 0; transition: all 0.3s ease; }
+.modal-backdrop.visible .modal-content { --tw-scale-x: 1; --tw-scale-y: 1; transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); opacity: 1; }
+.modal-close-btn { background-color: rgba(255,255,255,0.1); border-radius: 999px; width: 2rem; height: 2rem; display: grid; place-items: center; font-size: 1.5rem; line-height: 1; transition: background-color 0.2s; }
+.modal-close-btn:hover { background-color: rgba(255,255,255,0.2); }
+.modal-lg { width: 100%; max-width: 30rem; }
+
+/* ANIMAÇÕES DE ENTRADA E SAÍDA */
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+.row-entering { animation: fadeIn 0.3s ease forwards; }
+.row-exiting { animation: fadeOut 0.3s ease forwards; }
