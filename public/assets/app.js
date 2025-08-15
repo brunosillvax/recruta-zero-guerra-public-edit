@@ -1,12 +1,12 @@
 // Versão
-const VERSION = "war-public-v5.1.0-online"; // Corrigido carregamento de script
+const VERSION = "war-public-v5.2.0-online"; // Adicionado Compartilhamento de Ranking
 document.getElementById("version").textContent = VERSION;
 
-// Importa as funções necessárias dos SDKs do Firebase
+// Importa as funções do Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-// A configuração do seu app web Firebase
+// Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDYUtq1zxXleJDWd-XoCkx5GUKTuAaPcLk",
   authDomain: "recruta-zero.firebaseapp.com",
@@ -16,12 +16,9 @@ const firebaseConfig = {
   appId: "1:758953044147:web:9b5562b4d45e4faaaf28c6"
 };
 
-// Inicializa o Firebase e o Firestore
+// Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
-
-// --- O RESTANTE DO CÓDIGO PERMANECE O MESMO ---
 
 // ÍCONES SVG PROFISSIONAIS
 const ICONS = {
@@ -70,6 +67,7 @@ onSnapshot(playersRef, (querySnapshot) => {
 $("#search").addEventListener("input", render);
 $("#addPlayer").addEventListener("click", addPlayer);
 $("#tableWrapper").addEventListener('click', handleTableClick);
+$("#shareRankingBtn").addEventListener("click", shareRanking);
 
 // --- Lógica do Clock ---
 setInterval(tickClock, 1000);
@@ -90,6 +88,49 @@ document.addEventListener('click', (e) => {
 $("#saveSettings").addEventListener("click", saveSettings);
 $("#resetPointsBtn").addEventListener("click", resetAllPoints);
 
+// --- FUNÇÃO DE COMPARTILHAMENTO ---
+async function shareRanking() {
+    const shareBtn = $("#shareRankingBtn");
+    const originalText = shareBtn.innerHTML;
+    shareBtn.disabled = true;
+    shareBtn.innerHTML = `<span>Gerando imagem...</span>`;
+
+    const rankingContainer = $("#rankingTableContainer");
+
+    try {
+        const canvas = await html2canvas(rankingContainer, {
+            backgroundColor: "#0f172a",
+            scale: 2,
+        });
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const file = new File([blob], 'ranking.png', { type: 'image/png' });
+
+        const shareData = {
+            title: 'Ranking da Guerra - RECRUTA ZERO',
+            text: 'Confira a classificação atual da nossa guerra!',
+            files: [file],
+        };
+
+        if (navigator.canShare && navigator.canShare(shareData)) {
+            await navigator.share(shareData);
+        } else {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'ranking-recruta-zero.png';
+            link.click();
+            URL.revokeObjectURL(link.href);
+            await showAlert({ title: "Imagem Pronta!", message: "A imagem do ranking foi baixada. Agora é só arrastar o arquivo para sua conversa do WhatsApp Web." });
+        }
+    } catch (err) {
+        console.error("Erro ao compartilhar:", err);
+        showAlert({ title: "Erro", message: "Não foi possível gerar a imagem para compartilhamento." });
+    } finally {
+        shareBtn.disabled = false;
+        shareBtn.innerHTML = originalText;
+    }
+}
+
 // --- FUNÇÕES PRINCIPAIS ---
 function render() {
   renderTable();
@@ -102,11 +143,18 @@ async function addPlayer() {
   const pointsStr = await showPrompt({ title: 'Pontos Iniciais', message: `Quais os pontos para o Dia 1 de ${name}?`, type: 'number', initialValue: '0' });
   const points = Number.isFinite(parseInt(pointsStr, 10)) ? parseInt(pointsStr, 10) : 0;
   
-  const dailyPoints = Array(state.settings.totalDays).fill(0);
-  dailyPoints[0] = points;
+  const newPlayer = {
+      id: uid(),
+      name: name.trim(),
+      dailyPoints: Array(state.settings.totalDays).fill(0)
+  };
+  newPlayer.dailyPoints[0] = points;
   
-  const newPlayer = { name: name.trim(), dailyPoints };
-  await addDoc(playersRef, newPlayer);
+  // Salva no estado local temporariamente e re-renderiza para animação
+  state.players.push(newPlayer);
+  renderTable({ animateNewId: newPlayer.id });
+  // Salva no Firebase
+  await addDoc(playersRef, { name: newPlayer.name, dailyPoints: newPlayer.dailyPoints });
 }
 
 async function handleTableClick(e) {
@@ -116,7 +164,7 @@ async function handleTableClick(e) {
     if (!id || !action) return;
     const player = state.players.find(p => p.id === id);
     if (!player) return;
-
+    
     const playerDocRef = doc(db, "players", id);
 
     if (action === 'edit-name') {
@@ -136,7 +184,11 @@ async function handleTableClick(e) {
     } else if (action === 'remove') {
         const confirmed = await showConfirm({ title: 'Remover Jogador', message: `Tem certeza que deseja remover ${player.name}?` });
         if (confirmed) {
-            await deleteDoc(playerDocRef);
+            const row = target.closest('tr');
+            row.classList.add('row-exiting');
+            row.addEventListener('animationend', async () => {
+                await deleteDoc(playerDocRef);
+            }, { once: true });
         }
     }
 }
@@ -158,7 +210,7 @@ async function resetAllPoints() {
 // --- Funções de Renderização ---
 const formatNumber = (num) => (num || 0).toLocaleString('pt-BR');
 
-function renderTable() {
+function renderTable({ animateNewId = null } = {}) {
   const wrapper = $("#tableWrapper");
   const q = ($("#search").value || "").toLowerCase();
   
@@ -171,7 +223,8 @@ function renderTable() {
   const rows = filtered.map((p, i) => {
     const total = getTotalPoints(p);
     const dailyCells = p.dailyPoints.map((score, dayIdx) => `<td class="cell-numeric"><button data-id="${p.id}" data-action="edit-points" data-day-index="${dayIdx}" class="w-full h-full text-center">${formatNumber(score)}</button></td>`).join("");
-    return `<tr data-player-id="${p.id}"><td class="cell-numeric">${i + 1}</td><td class="align-left"><button data-id="${p.id}" data-action="edit-name" class="flex items-center gap-2 w-full text-left">${ICONS.edit}<span class="flex-grow min-w-0 truncate">${escapeHtml(p.name)}</span></button></td>${dailyCells}<td class="cell-numeric cell-total col-total-cell">${formatNumber(total)}</td><td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td></tr>`;
+    const animationClass = p.id === animateNewId ? 'row-entering' : '';
+    return `<tr class="${animationClass}" data-player-id="${p.id}"><td class="cell-numeric">${i + 1}</td><td class="align-left"><button data-id="${p.id}" data-action="edit-name" class="flex items-center gap-2 w-full text-left">${ICONS.edit}<span class="flex-grow min-w-0 truncate">${escapeHtml(p.name)}</span></button></td>${dailyCells}<td class="cell-numeric cell-total col-total-cell">${formatNumber(total)}</td><td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td></tr>`;
   }).join("");
 
   wrapper.innerHTML = `<table class="table"><thead><tr><th class="w-6">#</th><th>Jogador</th>${dayHeaders}<th class="w-14 col-total-header cell-total">Total</th><th class="w-10"></th></tr></thead><tbody id="player-tbody">${rows}</tbody></table>`;
@@ -287,3 +340,6 @@ async function showPrompt({ title, message, initialValue = '', type = 'text' }) 
     const safeInitialValue = String(initialValue || '');
     return showDialog({ title, body: `<label class="text-sm text-slate-300">${message}</label><input type="${type}" id="dialogInput" class="input mt-2" value="${escapeHtml(safeInitialValue)}">`, buttons: [{ text: 'Cancelar', class: 'btn-sec', value: null }, { text: 'OK', class: 'btn' }] });
 }
+
+// Inicializa a aplicação
+initSettingsInputs();
