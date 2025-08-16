@@ -8,6 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.8em%22 font-size=%2280%22>⚔️</text></svg>">
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="./assets/style.css">
 </head>
 <body class="bg-slate-900 text-slate-100">
@@ -30,12 +31,13 @@
     </div>
   </header>
 
+  <section id="announcementArea" class="card mt-2 hidden"></section>
+
   <section class="card mt-2 space-y-2">
     <div class="flex items-center justify-between gap-2 text-sm">
       <div>📅 <b>Data:</b> <span id="dateDisplay"></span></div>
       <div>⏰ <b>Hora:</b> <span id="timeDisplay"></span></div>
     </div>
-    
     <div class="flex items-center gap-2 pt-1">
       <div class="relative flex-1">
         <span class="absolute left-2 top-2">🔍</span>
@@ -43,13 +45,17 @@
       </div>
       <button id="addPlayer" class="btn">➕ Jogador</button>
     </div>
-    <div class="text-sm">📊 <b>Total Geral:</b> <span id="totalPoints">0</span></div>
+    
+    <div class="total-geral-card">
+        <div class="total-geral-label">📊 Total Geral do Clã</div>
+        <div id="totalPoints" class="total-geral-value">0</div>
+    </div>
   </section>
-
+  
   <section class="card mt-2">
     <div id="tableWrapper" class="table-wrapper"></div>
   </section>
-
+  
   <footer class="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur border-t border-slate-800">
     <div class="max-w-md mx-auto p-3 text-center text-xs text-slate-400">
       Placar Online • Versão <span id="version"></span>
@@ -64,7 +70,17 @@
       <button data-close-modal="rankingModal" class="modal-close-btn">&times;</button>
     </div>
     <div id="rankingTableContainer" class="table-wrapper max-h-96 overflow-y-auto">
-      <table class="w-full text-white text-sm"><thead class="sticky top-0 bg-slate-800 uppercase text-xs"><tr><th class="p-2 text-center">Pos.</th><th class="p-2 text-left">Jogador</th><th class="p-2 cell-numeric">Total</th></tr></thead><tbody id="rankingBody"></tbody></table>
+      <table class="w-full text-white text-sm">
+        <thead class="sticky top-0 bg-slate-800 uppercase text-xs">
+          <tr>
+            <th class="p-2 text-center">Pos.</th>
+            <th class="p-2 text-left">Jogador</th>
+            <th class="p-2 cell-numeric">Total</th>
+            <th class="p-2 cell-numeric">Média/Dia</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
     </div>
     <div class="mt-4 pt-4 border-t border-slate-700/50">
       <button id="shareRankingBtn" class="btn-whatsapp w-full">
@@ -84,9 +100,33 @@
     <div class="space-y-3 text-sm">
       <div class="flex items-center justify-between gap-2"><label for="totalDaysInput">Duração da Guerra (dias)</label><input id="totalDaysInput" type="number" min="1" max="10" class="input w-28"></div>
       <div class="flex items-center justify-between gap-2"><label for="maxPlayersInput">Máx. Jogadores</label><input id="maxPlayersInput" type="number" min="5" max="200" class="input w-28"></div>
+      <div class="pt-2">
+        <label class="block mb-1 font-bold">Bloqueio de Dias</label>
+        <p class="text-xs text-slate-400 mb-2">Clique no cadeado para trancar/destrancar a edição de pontos de um dia.</p>
+        <div id="dayLockContainer" class="day-lock-container">
+        </div>
+      </div>
+      <div class="pt-2">
+        <label class="block mb-1 font-bold">Mensagem/Aviso na Tela Inicial</label>
+        <textarea id="announcementInput" rows="3" class="input" placeholder="Ex: A guerra começa às 20h. Ataques espelhados!"></textarea>
+      </div>
       <div class="flex items-center justify-end gap-2 mt-2"><button id="saveSettings" class="btn">💾 Salvar</button></div>
       <hr class="border-slate-700 my-3">
-      <div><p class="text-xs text-slate-400 mb-2">Ação perigosa. Cuidado ao usar.</p><button id="resetPointsBtn" class="btn-danger w-full">⚠️ Resetar Pontos</button></div>
+      <div>
+        <p class="text-xs text-slate-400 mb-2">Use isso se alguns jogadores estiverem sem o avatar padrão.</p>
+        <button id="syncAvatarsBtn" class="btn-sec w-full">🔄 Sincronizar Avatares</button>
+      </div>
+      <hr class="border-slate-700 my-3">
+      <div class="space-y-2">
+        <div>
+          <p class="text-xs text-slate-400 mb-2">Zera a pontuação de todos os jogadores.</p>
+          <button id="resetPointsBtn" class="btn-danger w-full">⚠️ Resetar Pontos</button>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-2">Exclui permanentemente TODOS os jogadores.</p>
+          <button id="deleteAllPlayersBtn" class="btn-danger w-full">☠️ Excluir TODOS os Jogadores</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -99,8 +139,20 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<div id="chartModal" class="modal-backdrop">
+  <div class="modal-content card">
+    <div class="flex justify-between items-center mb-4">
+      <h2 id="chartModalTitle" class="text-lg font-bold"></h2>
+      <button data-close-modal="chartModal" class="modal-close-btn">&times;</button>
+    </div>
+    <div class="chart-container">
+      <canvas id="playerChartCanvas"></canvas>
+    </div>
+    <div id="playerNoteDisplay" class="player-note-display" style="display: none;"></div>
+  </div>
+</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script type="module" src="./assets/app.js"></script>
 </body>
 </html>

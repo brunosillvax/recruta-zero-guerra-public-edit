@@ -19,15 +19,45 @@ body { margin: 0; background: linear-gradient(to bottom, #1e293b, #0f172a); font
 .header-btn { background-color: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.2); width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; display: grid; place-items: center; transition: all 0.2s; }
 .header-btn:hover { background-color: rgba(255,255,255,0.1); border-color: rgba(148,163,184,0.3); }
 
+/* ===== Total Geral ===== */
+.total-geral-card {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background-color: rgba(15, 23, 42, 0.8);
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.total-geral-label {
+    font-weight: 600;
+    color: #cbd5e1;
+    display: flex; /* Adicionado */
+    align-items: center; /* Adicionado */
+    gap: 0.5rem; /* Adicionado */
+}
+.total-geral-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #f0f9ff;
+}
+
+
 /* ===== Tabela ===== */
 .table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; }
 .table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; color: #e6eef8; table-layout: auto; }
 .table thead th { background: rgba(15,23,42,0.9); padding: 12px 8px; font-weight: 700; text-align: center; white-space: nowrap; }
 .table tbody td { padding: 10px 8px; border-top: 1px solid rgba(148,163,184,0.1); vertical-align: middle; text-align: center; }
-.table tbody td.align-left { text-align: left; }
 .table tbody tr:hover { background-color: rgba(30,41,59,0.7); }
 .table .col-total-header { background-color: rgba(56, 189, 248, 0.1); }
 .table .col-total-cell { background-color: rgba(56, 189, 248, 0.05); }
+.table tbody td.align-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+}
 
 /* ===== Cores Ranking ===== */
 #rankingBody .gold { background: linear-gradient(135deg, #ffd700, #ffb300); color: #1f2937; font-weight: 700; }
@@ -37,10 +67,53 @@ body { margin: 0; background: linear-gradient(to bottom, #1e293b, #0f172a); font
 
 /* ===== Helpers e Ícones ===== */
 .cell-numeric { text-align: center; font-weight: 500; white-space: nowrap; }
+.cell-average { text-align: center; font-weight: 500; color: inherit; }
 .cell-total { font-weight: 700; color: #f0f9ff; text-align: right; padding-right: 1.25rem; }
 .icon { width: 1rem; height: 1rem; color: #94a3b8; }
 .icon-danger { color: #f87171; }
+.icon-note-active .icon { color: #38bdf8; }
 .btn-whatsapp .icon { width: 1.25rem; height: 1.25rem; color: white; }
+.ranking-avatar { display: inline-block; width: 1.5em; text-align: center; vertical-align: middle; filter: drop-shadow(0 0 1px rgba(0,0,0,0.6)); }
+
+/* ===== Estilos para Avatar e Nome na Tabela Principal ===== */
+.avatar-display {
+    font-size: 1.5rem;
+    line-height: 1;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+}
+.player-name-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-grow: 1;
+    min-width: 0;
+}
+.player-name-clickable {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    padding: 0.25rem 0;
+    transition: color 0.2s ease;
+}
+.player-name-clickable:hover {
+    color: #38bdf8;
+}
+.edit-icon-btn {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 4px;
+}
+.edit-icon-btn:hover {
+    background-color: rgba(255,255,255,0.1);
+}
 
 /* ===== Estilos para Modais ===== */
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
@@ -50,6 +123,63 @@ body { margin: 0; background: linear-gradient(to bottom, #1e293b, #0f172a); font
 .modal-close-btn { background-color: rgba(255,255,255,0.1); border-radius: 999px; width: 2rem; height: 2rem; display: grid; place-items: center; font-size: 1.5rem; line-height: 1; transition: background-color 0.2s; }
 .modal-close-btn:hover { background-color: rgba(255,255,255,0.2); }
 .modal-lg { width: 100%; max-width: 30rem; }
+
+/* ===== Estilo para o Gráfico ===== */
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+.player-note-display {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.player-note-display p {
+    margin: 0.25rem 0;
+}
+
+/* ===== Estilos para Bloqueio de Dias ===== */
+.day-lock-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.day-lock-btn {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.day-lock-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(148, 163, 184, 0.4);
+}
+.day-lock-btn.locked {
+    background-color: #1e40af;
+    border-color: #3b82f6;
+    color: white;
+}
+.cell-locked button {
+    cursor: not-allowed !important;
+    opacity: 0.5;
+    text-decoration: line-through;
+    color: #64748b;
+}
+.cell-locked button:hover {
+    background-color: transparent !important;
+}
+
 
 /* ANIMAÇÕES DE ENTRADA E SAÍDA */
 @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
