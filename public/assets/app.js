@@ -1,10 +1,8 @@
-// Versão
-const VERSION = "war-public-v5.13.0-online"; // Adicionado Bloqueio de Dias
-document.getElementById("version").textContent = VERSION;
+// --- Meta-informações e Importações ---
 
 // Importa as funções do Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
 // Configuração do Firebase
 const firebaseConfig = {
@@ -27,44 +25,51 @@ const ICONS = {
     note: `<svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>`
 };
 
-// PIN Config
-const PIN = "1590";
-
 // Helpers
 const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => el.querySelectorAll(s);
 const formatNumber = (num) => (num || 0).toLocaleString('pt-BR');
+const MIN_ROWS_DISPLAY = 10;
 
-// Estado local
+// --- Variáveis de Estado da Aplicação ---
 let state = {
-  settings: { maxPlayers: 50, totalDays: 4, announcementMessage: '', lockedDays: [] },
-  players: [],
+    settings: {
+        maxPlayers: 50,
+        totalDays: 4,
+        announcementMessage: '',
+        lockedDays: [],
+        adminPin: '1590'
+    },
+    players: [],
 };
-
-// Variável para guardar a instância do gráfico
 let playerChart = null;
-
-// Objeto para controlar o estado do formulário de configurações
-let settingsFormState = {
-    initialValues: {}
-};
+let settingsFormState = { initialValues: {} };
+let isWarningAdminMode = false;
+let lastWarWinners = {};
+let isSnapshotRunning = false;
 
 // --- Referências do Firestore ---
 const settingsRef = doc(db, "config", "settings");
 const playersRef = collection(db, "players");
+const winnersRef = doc(db, "config", "last_war_winners");
+const historyRef = collection(db, "war_history");
 
 // --- Listeners do Firestore ---
 onSnapshot(settingsRef, (docSnap) => {
     if (docSnap.exists()) {
         const dbSettings = docSnap.data();
-        state.settings = { 
+        state.settings = {
             maxPlayers: 50, totalDays: 4, announcementMessage: '', lockedDays: [],
-            ...dbSettings 
+            adminPin: '1590',
+            ...dbSettings
         };
-        while(state.settings.lockedDays.length < state.settings.totalDays) {
-            state.settings.lockedDays.push(false);
-        }
         initSettingsInputs();
         render();
+        updateTicker(); // Chama o ticker para atualizar o nome do clã se ele mudar
+
+        $("#clanNameDisplay").textContent = state.settings.clanName || 'RECRUTA ZERO《☆》';
+        $("#clanSubtitleDisplay").textContent = state.settings.clanSubtitle || 'Placar da Guerra Online';
+
     } else {
         setDoc(settingsRef, state.settings);
     }
@@ -73,11 +78,25 @@ onSnapshot(settingsRef, (docSnap) => {
 onSnapshot(playersRef, (querySnapshot) => {
     const playersFromDB = [];
     querySnapshot.forEach((doc) => {
-        playersFromDB.push({ id: doc.id, ...doc.data() });
+        playersFromDB.push({
+            id: doc.id,
+            ...doc.data(),
+            navalDefensePoints: doc.data().navalDefensePoints || 0
+        });
     });
     state.players = playersFromDB;
     render();
 });
+
+onSnapshot(winnersRef, (docSnap) => {
+    if (docSnap.exists()) {
+        lastWarWinners = docSnap.data();
+    } else {
+        lastWarWinners = {};
+    }
+    updateTicker();
+});
+
 
 // --- Event Listeners Globais ---
 $("#search").addEventListener("input", render);
@@ -85,15 +104,28 @@ $("#addPlayer").addEventListener("click", addPlayer);
 $("#tableWrapper").addEventListener('click', handleTableClick);
 $("#shareRankingBtn").addEventListener("click", shareRanking);
 
+// --- LISTENERS PARA DEFESA NAVAL ---
+$("#openNavalDefenseBtn").addEventListener("click", openNavalDefenseModal);
+$("#resetNavalDefenseBtn").addEventListener("click", resetAllNavalDefensePoints);
+$("#navalDefenseTableContainer").addEventListener('click', handleNavalDefenseTableClick);
+
 // --- Lógica do Clock ---
 setInterval(tickClock, 1000);
 tickClock();
 
 // --- Lógica dos Modais ---
 $("#openRankingBtn").addEventListener("click", () => showModal("rankingModal"));
+$("#openWarningsBtn").addEventListener("click", () => {
+    renderWarningsModal();
+    showModal("warningsModal");
+});
+$("#openHistoryBtn").addEventListener("click", () => {
+    renderHistoryModal();
+    showModal("historyModal");
+});
 $("#openSettingsBtn").addEventListener("click", async () => {
     const pin = await showPrompt({ title: 'PIN de Acesso', message: 'Digite o PIN para abrir as configurações.', type: 'password' });
-    if (pin === PIN) {
+    if (pin === state.settings.adminPin) {
         captureInitialSettingsState();
         showModal("settingsModal");
     }
@@ -111,15 +143,16 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const visibleModal = document.querySelector('.modal-backdrop.visible');
         if (visibleModal && visibleModal.id !== 'dialogModal') {
-             tryCloseModal(visibleModal.id);
+            tryCloseModal(visibleModal.id);
         }
     }
 });
 
 // --- Lógica do Painel de Configuração ---
 $("#saveSettings").addEventListener("click", saveSettings);
-$("#syncAvatarsBtn").addEventListener("click", syncAvatars);
+$("#toggleWarningAdminBtn").addEventListener("click", toggleWarningAdminMode);
 $("#resetPointsBtn").addEventListener("click", resetAllPoints);
+$("#resetWarningsBtn").addEventListener("click", resetAllWarnings);
 $("#deleteAllPlayersBtn").addEventListener("click", deleteAllPlayers);
 $("#dayLockContainer").addEventListener("click", (e) => {
     const target = e.target.closest('.day-lock-btn');
@@ -133,35 +166,41 @@ $("#dayLockContainer").addEventListener("click", (e) => {
 function render() {
     renderTable();
     renderAnnouncement();
+
+    if ($("#navalDefenseModal").classList.contains('visible')) {
+        renderNavalDefenseTable();
+    }
 }
 
+// COLE ESTE BLOCO NO LUGAR DO ANTIGO
 async function addPlayer() {
-    if (state.players.length >= state.settings.maxPlayers) return showAlert({ title: "Limite Atingido", message: "Você atingiu o número máximo de jogadores." });
+    if (state.players.length >= state.settings.maxPlayers) {
+        return showAlert({ title: "Limite Atingido", message: "Você atingiu o número máximo de jogadores." });
+    }
+    
+    // Apenas pede o nome do jogador
     const name = await showPrompt({ title: 'Adicionar Jogador', message: 'Qual o nome do novo jogador?' });
     if (!name || !name.trim()) return;
-    const pointsStr = await showPrompt({ title: 'Pontos Iniciais', message: `Quais os pontos para o Dia 1 de ${name.trim()}?`, type: 'number', initialValue: '0' });
-    const points = Number.isFinite(parseInt(pointsStr, 10)) ? parseInt(pointsStr, 10) : 0;
+
+    // Cria o novo jogador, já com 0 pontos por padrão
     const newPlayer = {
-        id: uid(),
         name: name.trim(),
-        avatar: '⚔️',
         note: '',
+        warnings: 0,
+        navalDefensePoints: 0,
         dailyPoints: Array(state.settings.totalDays).fill(0)
     };
-    newPlayer.dailyPoints[0] = points;
-    state.players.push(newPlayer);
-    renderTable({ animateNewId: newPlayer.id });
-    await addDoc(playersRef, { 
-        name: newPlayer.name, 
-        avatar: newPlayer.avatar, 
-        note: newPlayer.note, 
-        dailyPoints: newPlayer.dailyPoints 
-    });
+
+    // Salva o novo jogador no Firebase
+    await addDoc(playersRef, newPlayer);
 }
 
 async function handleTableClick(e) {
     const target = e.target.closest('button, [data-action="show-chart"]');
     if (!target) return;
+
+    if (target.closest('.empty-row')) return;
+
     const { id, action, dayIndex } = target.dataset;
     if (!id || !action) return;
     const player = state.players.find(p => p.id === id);
@@ -177,7 +216,7 @@ async function handleTableClick(e) {
         }
     } else if (action === 'edit-note') {
         const pin = await showPrompt({ title: 'PIN de Acesso', message: 'Digite o PIN para editar a anotação.', type: 'password' });
-        if (pin === PIN) {
+        if (pin === state.settings.adminPin) {
             const newNote = await showPrompt({ title: `Nota sobre ${player.name}`, message: 'Digite sua anotação (visível para todos):', initialValue: player.note || '' });
             if (newNote !== null) {
                 await updateDoc(playerDocRef, { note: newNote.trim() });
@@ -207,31 +246,6 @@ async function handleTableClick(e) {
             row.addEventListener('animationend', async () => {
                 await deleteDoc(playerDocRef);
             }, { once: true });
-        }
-    }
-}
-
-async function syncAvatars() {
-    const confirmed = await showConfirm({
-        title: 'Sincronizar Avatares',
-        message: 'Esta ação irá verificar todos os jogadores e adicionar o avatar padrão (⚔️) para aqueles que não o possuem. Deseja continuar?',
-        confirmText: 'Sim, Sincronizar'
-    });
-    if (confirmed) {
-        const batch = writeBatch(db);
-        let updatesMade = 0;
-        state.players.forEach(player => {
-            if (!player.avatar) {
-                const playerDocRef = doc(db, "players", player.id);
-                batch.update(playerDocRef, { avatar: '⚔️' });
-                updatesMade++;
-            }
-        });
-        if (updatesMade > 0) {
-            await batch.commit();
-            showAlert({ title: 'Sucesso', message: `${updatesMade} jogadores foram atualizados com o avatar padrão.` });
-        } else {
-            showAlert({ title: 'Nenhuma Ação Necessária', message: 'Todos os jogadores já possuem um avatar.' });
         }
     }
 }
@@ -274,10 +288,7 @@ async function shareRanking() {
     shareBtn.innerHTML = `<span>Gerando imagem...</span>`;
     const rankingContainer = $("#rankingTableContainer");
     try {
-        const canvas = await html2canvas(rankingContainer, {
-            backgroundColor: "#0f172a",
-            scale: 2,
-        });
+        const canvas = await html2canvas(rankingContainer, { backgroundColor: "#0f172a", scale: 2 });
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         const file = new File([blob], 'ranking.png', { type: 'image/png' });
         const shareData = {
@@ -304,6 +315,59 @@ async function shareRanking() {
     }
 }
 
+async function renderHistoryModal() {
+    const content = $("#historyContent");
+    content.innerHTML = '<p class="text-center text-slate-400">Carregando histórico...</p>';
+
+    try {
+        const q = query(historyRef, orderBy("snapshotTimestamp", "desc"), limit(3));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            content.innerHTML = '<p class="text-center text-slate-400">Nenhum histórico de guerras encontrado.</p>';
+            return;
+        }
+
+        let historyHTML = '';
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            const warDate = data.snapshotTimestamp.toDate().toLocaleDateString('pt-BR', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            const navalWinnerHTML = data.navalWinnerName ? `
+                <div class="history-winner">
+                    <span>⛵</span>
+                    <div>
+                        <strong>${escapeHtml(data.navalWinnerName)}</strong>
+                        <span class="text-slate-400">- ${formatNumber(data.navalWinnerScore)} Pontos</span>
+                    </div>
+                </div>` : '';
+
+            historyHTML += `
+                <div class="history-entry">
+                    <p class="history-date">GUERRA FINALIZADA EM: ${warDate}</p>
+                    <div class="space-y-2">
+                        <div class="history-winner">
+                            <span>🏆</span>
+                            <div>
+                                <strong>${escapeHtml(data.warWinnerName)}</strong>
+                                <span class="text-slate-400">- ${formatNumber(data.warWinnerScore)} Pontos</span>
+                            </div>
+                        </div>
+                        ${navalWinnerHTML}
+                    </div>
+                </div>
+            `;
+        });
+        content.innerHTML = historyHTML;
+    } catch (error) {
+        console.error("Erro ao buscar histórico:", error);
+        content.innerHTML = '<p class="text-center text-red-400">Falha ao carregar o histórico.</p>';
+    }
+}
+
+
 // --- Funções de Renderização ---
 function renderAnnouncement() {
     const area = $("#announcementArea");
@@ -322,35 +386,77 @@ function renderTable({ animateNewId = null } = {}) {
     const filtered = state.players.filter(p => p.name.toLowerCase().includes(q));
     filtered.sort((a, b) => getTotalPoints(b) - getTotalPoints(a));
     const dayHeaders = Array.from({ length: state.settings.totalDays }, (_, i) => `<th class="w-10">D${i + 1}</th>`).join("");
-    const rows = filtered.map((p, i) => {
+
+    let rowsHTML = filtered.map((p, i) => {
         const total = getTotalPoints(p);
         const dailyCells = p.dailyPoints.map((score, dayIdx) => {
             const isLocked = state.settings.lockedDays && state.settings.lockedDays[dayIdx];
             return `<td class="cell-numeric ${isLocked ? 'cell-locked' : ''}">
-                <button data-id="${p.id}" data-action="edit-points" data-day-index="${dayIdx}" class="w-full h-full text-center" ${isLocked ? 'disabled' : ''}>
-                    ${formatNumber(score)}
-                </button>
-            </td>`;
+                        <button data-id="${p.id}" data-action="edit-points" data-day-index="${dayIdx}" class="w-full h-full text-center" ${isLocked ? 'disabled' : ''}>
+                            ${formatNumber(score)}
+                        </button>
+                    </td>`;
         }).join("");
         const animationClass = p.id === animateNewId ? 'row-entering' : '';
-        const playerAvatar = p.avatar || '⚔️';
         const noteIconColor = (p.note || '').trim() ? 'icon-note-active' : '';
-        return `<tr class="${animationClass}" data-player-id="${p.id}">
-            <td class="cell-numeric">${i + 1}</td>
-            <td class="align-left">
-                <span class="avatar-display">${escapeHtml(playerAvatar)}</span>
-                <div class="player-name-container">
-                    <span class="player-name-clickable" data-id="${p.id}" data-action="show-chart">${escapeHtml(p.name)}</span>
-                    <button class="edit-icon-btn" data-id="${p.id}" data-action="edit-name">${ICONS.edit}</button>
-                    <button class="edit-icon-btn ${noteIconColor}" data-id="${p.id}" data-action="edit-note">${ICONS.note}</button>
-                </div>
-            </td>
-            ${dailyCells}
-            <td class="cell-numeric cell-total col-total-cell">${formatNumber(total)}</td>
-            <td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td>
-        </tr>`;
+
+        let warningsDisplay = '';
+        const warnings = p.warnings || 0;
+        let rowClass = '';
+        if (warnings === 1) {
+            warningsDisplay = '<span class="player-warning-icon">⚠</span>';
+        } else if (warnings === 2) {
+            warningsDisplay = '<span class="player-warning-icon">⚠⚠</span>';
+        } else if (warnings >= 3) {
+            rowClass = 'player-banned';
+            warningsDisplay = '<span class="player-banned-icon">📵</span>';
+        }
+        
+        const topPlayerClass = (i === 0 && total > 0) ? 'top-player-row' : '';
+
+        return `<tr class="${animationClass} ${rowClass} ${topPlayerClass}" data-player-id="${p.id}">
+                    <td class="cell-numeric">${i + 1}</td>
+                    <td class="align-left">
+                        <div class="player-name-container">
+                            <span class="player-name-clickable" data-id="${p.id}" data-action="show-chart">
+                                <span class="player-name-warnings">${escapeHtml(p.name)} ${warningsDisplay}</span>
+                            </span>
+                            <button class="edit-icon-btn" data-id="${p.id}" data-action="edit-name">${ICONS.edit}</button>
+                            <button class="edit-icon-btn ${noteIconColor}" data-id="${p.id}" data-action="edit-note">${ICONS.note}</button>
+                        </div>
+                    </td>
+                    ${dailyCells}
+                    <td class="cell-numeric cell-total col-total-cell">${formatNumber(total)}</td>
+                    <td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td>
+                </tr>`;
     }).join("");
-    wrapper.innerHTML = `<table class="table"><thead><tr><th class="w-6">#</th><th>Jogador</th>${dayHeaders}<th class="w-14 col-total-header cell-total">Total</th><th class="w-10"></th></tr></thead><tbody id="player-tbody">${rows}</tbody></table>`;
+
+    const emptyRowsCount = MIN_ROWS_DISPLAY - filtered.length;
+    if (emptyRowsCount > 0) {
+        let emptyRowsToAdd = '';
+        const emptyDailyCells = Array(state.settings.totalDays).fill('<td class="cell-numeric">0</td>').join('');
+        for (let i = 0; i < emptyRowsCount; i++) {
+            const pos = filtered.length + i + 1;
+            emptyRowsToAdd += `
+                <tr class="empty-row">
+                    <td class="cell-numeric">${pos}</td>
+                    <td class="align-left">
+                        <div class="player-name-container">
+                            <span class="player-name-clickable" style="color: transparent;">-</span>
+                            <button class="edit-icon-btn">${ICONS.edit}</button>
+                            <button class="edit-icon-btn">${ICONS.note}</button>
+                        </div>
+                    </td>
+                    ${emptyDailyCells}
+                    <td class="cell-numeric cell-total col-total-cell">0</td>
+                    <td><button class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td>
+                </tr>
+            `;
+        }
+        rowsHTML += emptyRowsToAdd;
+    }
+
+    wrapper.innerHTML = `<table class="table"><thead><tr><th class="w-6">#</th><th>Jogador</th>${dayHeaders}<th class="w-14 col-total-header cell-total">Total</th><th class="w-10"></th></tr></thead><tbody id="player-tbody">${rowsHTML}</tbody></table>`;
     const grandTotal = state.players.reduce((sum, p) => sum + getTotalPoints(p), 0);
     $("#totalPoints").textContent = formatNumber(grandTotal);
     renderRanking(filtered);
@@ -368,13 +474,12 @@ function renderRanking(list) {
         const totalPoints = getTotalPoints(p);
         const daysScored = p.dailyPoints.filter(score => (score || 0) > 0).length;
         const average = daysScored > 0 ? (totalPoints / daysScored) : 0;
-        const playerAvatar = `<span class="ranking-avatar">${escapeHtml(p.avatar || '⚔️')}</span>`;
         return `<tr class="${cls}">
-            <td class="p-2 text-center">${i + 1}</td>
-            <td class="p-2 text-left">${playerAvatar} ${escapeHtml(p.name)}</td>
-            <td class="p-2 cell-numeric">${formatNumber(totalPoints)}</td>
-            <td class="p-2 cell-average">${average.toFixed(1)}</td>
-        </tr>`;
+                    <td class="p-2 text-center">${i + 1}</td>
+                    <td class="p-2 text-left">${escapeHtml(p.name)}</td>
+                    <td class="p-2 cell-numeric">${formatNumber(totalPoints)}</td>
+                    <td class="p-2 cell-average">${average.toFixed(1)}</td>
+                </tr>`;
     }).join("");
 }
 
@@ -385,12 +490,18 @@ async function saveSettings() {
     const newAnnouncement = $("#announcementInput").value.trim();
     const lockButtons = document.querySelectorAll('#dayLockContainer .day-lock-btn');
     const newLockedDays = Array.from(lockButtons).map(btn => btn.classList.contains('locked'));
+    const newClanName = $("#clanNameInput").value.trim();
+    const newClanSubtitle = $("#clanSubtitleInput").value.trim();
+    const newAdminPin = $("#adminPinInput").value.trim() || '1590';
 
     const newSettings = {
         totalDays: newTotalDays,
         maxPlayers: newMaxPlayers,
         announcementMessage: newAnnouncement,
-        lockedDays: newLockedDays
+        lockedDays: newLockedDays,
+        clanName: newClanName,
+        clanSubtitle: newClanSubtitle,
+        adminPin: newAdminPin
     };
 
     if (newTotalDays !== state.settings.totalDays) {
@@ -403,6 +514,7 @@ async function saveSettings() {
         });
         await batch.commit();
     }
+
     await setDoc(settingsRef, newSettings);
     showAlert({ title: 'Sucesso', message: 'Configurações salvas.' });
     captureInitialSettingsState();
@@ -412,6 +524,9 @@ function initSettingsInputs() {
     $("#totalDaysInput").value = state.settings.totalDays;
     $("#maxPlayersInput").value = state.settings.maxPlayers;
     $("#announcementInput").value = state.settings.announcementMessage || '';
+    $("#clanNameInput").value = state.settings.clanName || 'RECRUTA ZERO《☆》';
+    $("#clanSubtitleInput").value = state.settings.clanSubtitle || 'Placar da Guerra Online';
+    $("#adminPinInput").value = state.settings.adminPin || '1590';
     renderDayLocks();
 }
 
@@ -442,38 +557,50 @@ function uid() { return Math.random().toString(36).slice(2, 9); }
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
+// Substitua sua função openChartModal inteira por esta
 function openChartModal(player) {
     const chartCanvas = $("#playerChartCanvas");
     const noteDisplay = $("#playerNoteDisplay");
+    const managementArea = $("#playerManagementArea");
+
     $("#chartModalTitle").textContent = `Desempenho de: ${escapeHtml(player.name)}`;
+
+    const warnings = player.warnings || 0;
+    
+    // ⭐ AQUI ESTÁ A MUDANÇA NO LAYOUT ⭐
+    managementArea.innerHTML = `
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <label class="font-bold text-sm">Advertências:<span class="text-xl font-black text-yellow-400 ml-2">${warnings}</span></label>
+                <button id="removeWarningBtn" class="btn-sec py-1 px-3 text-xs" ${warnings === 0 ? 'disabled' : ''}>- Remover</button>
+            </div>
+
+            <button id="addWarningBtn" class="btn py-1 px-3 text-xs" ${warnings >= 3 ? 'disabled' : ''}>+ Adicionar</button>
+        </div>
+    `;
+    $("#addWarningBtn").onclick = () => updateWarnings(player.id, 1);
+    $("#removeWarningBtn").onclick = () => updateWarnings(player.id, -1);
+
     if (player.note && player.note.trim() !== '') {
         noteDisplay.innerHTML = `<p class="font-bold text-slate-300">Anotação:</p><p>${escapeHtml(player.note)}</p>`;
         noteDisplay.style.display = 'block';
     } else {
         noteDisplay.style.display = 'none';
     }
-    if (playerChart) {
-        playerChart.destroy();
-    }
+    if (playerChart) { playerChart.destroy(); }
     const labels = Array.from({ length: player.dailyPoints.length }, (_, i) => `Dia ${i + 1}`);
     const data = {
         labels: labels,
         datasets: [{
-            label: 'Pontos Diários',
-            data: player.dailyPoints.map(p => p || 0),
-            backgroundColor: 'rgba(56, 189, 248, 0.5)',
-            borderColor: 'rgba(56, 189, 248, 1)',
-            borderWidth: 2,
-            borderRadius: 4,
-            barThickness: 30
+            label: 'Pontos Diários', data: player.dailyPoints.map(p => p || 0),
+            backgroundColor: 'rgba(56, 189, 248, 0.5)', borderColor: 'rgba(56, 189, 248, 1)',
+            borderWidth: 2, borderRadius: 4, barThickness: 30
         }]
     };
     const config = {
-        type: 'bar',
-        data: data,
+        type: 'bar', data: data,
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             scales: {
                 y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
                 x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
@@ -495,7 +622,10 @@ function captureInitialSettingsState() {
         totalDays: $("#totalDaysInput").value,
         maxPlayers: $("#maxPlayersInput").value,
         announcement: $("#announcementInput").value.trim(),
-        lockedDays: JSON.stringify(lockedDaysState)
+        lockedDays: JSON.stringify(lockedDaysState),
+        clanName: $("#clanNameInput").value.trim(),
+        clanSubtitle: $("#clanSubtitleInput").value.trim(),
+        adminPin: $("#adminPinInput").value.trim()
     };
 }
 
@@ -506,7 +636,10 @@ function isSettingsFormDirty() {
         totalDays: $("#totalDaysInput").value,
         maxPlayers: $("#maxPlayersInput").value,
         announcement: $("#announcementInput").value.trim(),
-        lockedDays: JSON.stringify(currentLockedDaysState)
+        lockedDays: JSON.stringify(currentLockedDaysState),
+        clanName: $("#clanNameInput").value.trim(),
+        clanSubtitle: $("#clanSubtitleInput").value.trim(),
+        adminPin: $("#adminPinInput").value.trim()
     };
     return JSON.stringify(currentValues) !== JSON.stringify(settingsFormState.initialValues);
 }
@@ -576,5 +709,329 @@ async function showPrompt({ title, message, initialValue = '', type = 'text' }) 
     return showDialog({ title, body: `<label class="text-sm text-slate-300">${message}</label><input type="${type}" id="dialogInput" class="input mt-2" value="${escapeHtml(safeInitialValue)}">`, buttons: [{ text: 'Cancelar', class: 'btn-sec', value: null }, { text: 'OK', class: 'btn' }] });
 }
 
+async function updateWarnings(playerId, change) {
+    if (!isWarningAdminMode) {
+        showAlert({
+            title: "Edição Bloqueada",
+            message: "Para adicionar ou remover advertências, primeiro ative o 'Modo de Edição' nas Configurações ⚙️."
+        });
+        return;
+    }
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) return;
+    const currentWarnings = player.warnings || 0;
+    let newWarnings = currentWarnings + change;
+    if (newWarnings < 0) newWarnings = 0;
+    if (newWarnings > 3) newWarnings = 3;
+    const playerDocRef = doc(db, "players", playerId);
+    await updateDoc(playerDocRef, { warnings: newWarnings });
+    player.warnings = newWarnings;
+    openChartModal(player);
+    renderTable();
+}
+
+async function resetAllWarnings() {
+    const confirmed = await showConfirm({
+        title: 'Resetar Advertências',
+        message: 'Tem certeza que deseja ZERAR as advertências de TODOS os jogadores? Esta ação é ideal para o início de uma nova temporada.',
+        confirmText: 'Sim, Zerar Tudo'
+    });
+    if (confirmed) {
+        const batch = writeBatch(db);
+        state.players.forEach(player => {
+            if (player.warnings && player.warnings > 0) {
+                const playerDocRef = doc(db, "players", player.id);
+                batch.update(playerDocRef, { warnings: 0 });
+            }
+        });
+        await batch.commit();
+        showAlert({ title: 'Sucesso', message: 'Todas as advertências foram resetadas.' });
+    }
+}
+
+function renderWarningsModal() {
+    const content = $("#warningsContent");
+    const level1 = state.players.filter(p => p.warnings === 1).sort((a, b) => a.name.localeCompare(b.name));
+    const level2 = state.players.filter(p => p.warnings === 2).sort((a, b) => a.name.localeCompare(b.name));
+    const banned = state.players.filter(p => p.warnings >= 3).sort((a, b) => a.name.localeCompare(b.name));
+    const createPlayerList = (players) => {
+        if (players.length === 0) return '<p class="text-slate-400">Nenhum jogador nesta categoria.</p>';
+        return `<ul class="warnings-list">${players.map(p => `<li>📌 ${escapeHtml(p.name)} (${p.warnings}-Adv)</li>`).join('')}</ul>`;
+    };
+    const createBannedList = (players) => {
+        if (players.length === 0) return '<p class="text-slate-400">Nenhum jogador banido.</p>';
+        return `<ul class="warnings-list">${players.map(p => `<li>📌 ${escapeHtml(p.name)} - (Ban📵)</li>`).join('')}</ul>`;
+    };
+    content.innerHTML = `
+        <div class="warnings-category"><h3>⚠ GERAL (1 Advertência)</h3>${createPlayerList(level1)}</div>
+        <div class="warnings-category risk-zone"><h3>⚠ ZONA DE RISCO (2 Advertências)</h3>${createPlayerList(level2)}</div>
+        <div class="warnings-rule">🇧🇷 Completando 3 ADV. É REMOVIDO DO CLÃ.</div>
+        <div class="warnings-category banned"><h3>📵 BANIDOS (3+ Advertências)</h3>${createBannedList(banned)}</div>
+        <p class="text-xs text-slate-400 text-center mt-4">🔥 As advertências são canceladas no dia em que inicia a nova temporada do Clash.</p>`;
+}
+
+function toggleWarningAdminMode() {
+    isWarningAdminMode = !isWarningAdminMode;
+    const header = $('header');
+    const toggleBtn = $('#toggleWarningAdminBtn');
+    if (isWarningAdminMode) {
+        header.classList.add('admin-mode-active');
+        toggleBtn.textContent = '🔒 Bloquear Edição de Advertências';
+        toggleBtn.classList.remove('btn-sec');
+        toggleBtn.classList.add('btn-admin-active');
+        showAlert({ title: "Modo de Edição Ativado", message: "Agora você pode adicionar ou remover advertências sem precisar do PIN." });
+    } else {
+        header.classList.remove('admin-mode-active');
+        toggleBtn.textContent = '🔓 Liberar Edição de Advertências';
+        toggleBtn.classList.add('btn-sec');
+        toggleBtn.classList.remove('btn-admin-active');
+    }
+}
+
+function initializeSettingsTabs() {
+    const tabNav = $('.tab-nav');
+    if (!tabNav) return;
+    const tabBtns = $$('.tab-btn', tabNav);
+    const tabPanels = $$('.tab-panel', tabNav.nextElementSibling);
+
+    tabNav.addEventListener('click', (e) => {
+        const clickedTab = e.target.closest('.tab-btn');
+        if (!clickedTab) return;
+
+        tabBtns.forEach(btn => btn.classList.remove('active'));
+        clickedTab.classList.add('active');
+
+        const tabId = clickedTab.dataset.tab;
+        tabPanels.forEach(panel => {
+            if (panel.id === `tab-${tabId}`) {
+                panel.classList.add('active');
+            } else {
+                panel.classList.remove('active');
+            }
+        });
+    });
+}
+
+// ==========================================================
+// ========== LÓGICA DA FUNCIONALIDADE DEFESA NAVAL =========
+// ==========================================================
+
+function openNavalDefenseModal() {
+    renderNavalDefenseTable();
+    showModal('navalDefenseModal');
+}
+
+function renderNavalDefenseTable() {
+    const container = $("#navalDefenseTableContainer");
+    const totalDisplay = $("#navalDefenseTotal");
+
+    const sortedPlayers = [...state.players].sort((a, b) => (b.navalDefensePoints || 0) - (a.navalDefensePoints || 0));
+
+    const totalPoints = sortedPlayers.reduce((sum, player) => sum + (player.navalDefensePoints || 0), 0);
+    totalDisplay.innerHTML = `
+      <div class="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2 text-center">
+          <span class="text-xs uppercase font-bold text-slate-400 tracking-wider block">Total do Clã</span>
+          <span class="text-2xl font-black text-sky-400">${formatNumber(totalPoints)}</span>
+      </div>
+    `;
+
+    if (sortedPlayers.length === 0) {
+        container.innerHTML = `<p class="text-center p-4 text-slate-400">Nenhum jogador para exibir.</p>`;
+        return;
+    }
+
+    const rowsHTML = sortedPlayers.map((p, index) => {
+        const points = p.navalDefensePoints || 0;
+        const status = points > 0 ? 'Realizado' : 'Pendente';
+        const statusClass = points > 0 ? 'status-realizado' : 'status-pendente';
+
+        return `
+            <tr>
+                <td class="p-2 text-center">${index + 1}º</td>
+                <td class="p-2 text-left">
+                    ${escapeHtml(p.name)}
+                </td>
+                <td class="p-2 cell-numeric">${formatNumber(points)}</td>
+                <td class="p-2 text-center">
+                    <span class="${statusClass}">${status}</span>
+                </td>
+                <td class="p-2 text-center">
+                    <button class="btn-sec py-1 px-3 text-xs" data-id="${p.id}" data-action="edit-naval-points">
+                        Editar
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    container.innerHTML = `
+        <table class="w-full text-white text-sm">
+            <thead class="sticky top-0 bg-slate-800 uppercase text-xs">
+                <tr>
+                    <th class="p-2 text-center">Pos.</th>
+                    <th class="p-2 text-left">Jogador</th>
+                    <th class="p-2 cell-numeric">Pontos</th>
+                    <th class="p-2 text-center">Status</th>
+                    <th class="p-2 text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="navalDefenseBody">${rowsHTML}</tbody>
+        </table>
+    `;
+}
+
+async function handleNavalDefenseTableClick(e) {
+    const target = e.target.closest('button');
+    if (!target || target.dataset.action !== 'edit-naval-points') return;
+
+    const playerId = target.dataset.id;
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const newPointsStr = await showPrompt({
+        title: `Pontos Navais de ${player.name}`,
+        message: 'Digite a nova pontuação:',
+        type: 'number',
+        initialValue: player.navalDefensePoints || 0
+    });
+
+    const newPoints = parseInt(newPointsStr, 10);
+    if (Number.isFinite(newPoints)) {
+        const playerDocRef = doc(db, "players", playerId);
+        await updateDoc(playerDocRef, { navalDefensePoints: newPoints });
+    }
+}
+
+async function resetAllNavalDefensePoints() {
+    const confirmed = await showConfirm({
+        title: 'Resetar Pontos Navais',
+        message: 'Tem certeza que deseja ZERAR a pontuação naval de TODOS os jogadores? Esta ação não pode ser desfeita.',
+        confirmText: 'Sim, Zerar Tudo'
+    });
+
+    if (confirmed) {
+        const batch = writeBatch(db);
+        state.players.forEach(player => {
+            const playerDocRef = doc(db, "players", player.id);
+            batch.update(playerDocRef, { navalDefensePoints: 0 });
+        });
+        await batch.commit();
+        showAlert({ title: 'Sucesso', message: 'Todos os pontos de defesa naval foram resetados.' });
+    }
+}
+
+// ==========================================================
+// =========== LÓGICA DO LETREIRO AUTOMÁTICO ================
+// ==========================================================
+function updateTicker() {
+    const tickerElement = $("#ticker-text");
+    if (!tickerElement) return;
+
+    // 1. Monta as mensagens que devem aparecer
+    const messages = [];
+    if (lastWarWinners.warWinnerName) {
+        messages.push(`🏆 Vencedor da Guerra: ${lastWarWinners.warWinnerName} com ${formatNumber(lastWarWinners.warWinnerScore)} pontos!`);
+    }
+    messages.push(state.settings.clanName ? `${state.settings.clanName} — ${state.settings.clanSubtitle}` : `RECRUTA ZERO《☆》— Placar da Guerra Online`);
+
+    const separator = `&nbsp;`.repeat(10) + `•` + `&nbsp;`.repeat(10);
+    const uniqueContent = messages.join(separator);
+
+    // 2. Coloca o conteúdo duplicado dentro de spans para medição
+    tickerElement.innerHTML = `<span>${uniqueContent}${separator}</span><span>${uniqueContent}${separator}</span>`;
+
+    // 3. Mede o tamanho exato em pixels do primeiro bloco de texto
+    const contentSpan = tickerElement.querySelector('span');
+    if (!contentSpan) return;
+    const scrollWidth = contentSpan.offsetWidth;
+
+    // 4. Calcula uma duração de animação baseada no tamanho do texto (velocidade constante)
+    const scrollSpeed = 60; // pixels por segundo
+    const duration = scrollWidth / scrollSpeed;
+
+    // 5. Remove qualquer estilo de animação antigo e cria o novo dinamicamente
+    const styleSheetId = 'dynamic-ticker-style';
+    let styleSheet = document.getElementById(styleSheetId);
+    if (styleSheet) {
+        styleSheet.remove();
+    }
+
+    styleSheet = document.createElement('style');
+    styleSheet.id = styleSheetId;
+    styleSheet.innerHTML = `
+        @keyframes dynamicTicker {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-${scrollWidth}px); }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+    
+    // 6. Aplica a nova animação perfeita no elemento
+    tickerElement.style.animation = `dynamicTicker ${duration.toFixed(2)}s linear infinite`;
+}
+
+async function runAutomaticSnapshot() {
+    console.log("Rodando snapshot automático dos vencedores...");
+
+    if (state.players.length === 0) {
+        console.log("Nenhum jogador para snapshot.");
+        return;
+    }
+
+    const sortedByWar = [...state.players].sort((a, b) => {
+        const totalA = a.dailyPoints.reduce((sum, p) => sum + (p || 0), 0);
+        const totalB = b.dailyPoints.reduce((sum, p) => sum + (p || 0), 0);
+        return totalB - totalA;
+    });
+    const topWarPlayer = sortedByWar[0];
+    const topWarScore = topWarPlayer.dailyPoints.reduce((sum, p) => sum + (p || 0), 0);
+    
+    const sortedByNaval = [...state.players].sort((a, b) => (b.navalDefensePoints || 0) - (a.navalDefensePoints || 0));
+    const topNavalPlayer = sortedByNaval.length > 0 ? sortedByNaval[0] : { name: 'N/A', navalDefensePoints: 0 };
+
+    const winnersData = {
+        warWinnerName: topWarPlayer.name,
+        warWinnerScore: topWarScore,
+        navalWinnerName: topNavalPlayer.name,
+        navalWinnerScore: topNavalPlayer.navalDefensePoints || 0,
+        snapshotTimestamp: new Date()
+    };
+
+    await setDoc(winnersRef, { 
+        warWinnerName: winnersData.warWinnerName,
+        warWinnerScore: winnersData.warWinnerScore,
+        snapshotTimestamp: winnersData.snapshotTimestamp
+    });
+    await addDoc(historyRef, winnersData);
+    console.log("Vencedores da semana salvos com sucesso no ticker e no histórico!");
+}
+
+async function checkAndRunAutomaticSnapshot() {
+    if (isSnapshotRunning) return;
+
+    const now = new Date();
+    const todayIsMonday = now.getDay() === 1;
+    const isAfterDeadlineTime = now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 45);
+
+    if (!todayIsMonday || !isAfterDeadlineTime) {
+        return;
+    }
+
+    const lastSnapshotDate = lastWarWinners.snapshotTimestamp ? new Date(lastWarWinners.snapshotTimestamp.seconds * 1000) : new Date(0);
+
+    const lastMonday = new Date(now);
+    lastMonday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+    lastMonday.setHours(6, 45, 0, 0);
+
+    if (lastSnapshotDate < lastMonday) {
+        isSnapshotRunning = true;
+        await runAutomaticSnapshot();
+        isSnapshotRunning = false;
+    }
+}
+
 // Inicializa a aplicação
 initSettingsInputs();
+initializeSettingsTabs();
+checkAndRunAutomaticSnapshot();
+setInterval(checkAndRunAutomaticSnapshot, 1000 * 60 * 5);
