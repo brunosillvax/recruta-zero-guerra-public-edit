@@ -16,194 +16,275 @@
 </head>
 
 <body class="bg-slate-900 text-slate-100">
-<main class="max-w-md mx-auto min-h-screen pb-20">
-<header class="sticky top-0 z-30 backdrop-blur bg-slate-900/70">
-  <div class="flex items-center justify-between py-3 px-4">
-    <div class="flex items-center gap-2">
-      <div>
-        <h1 id="clanNameDisplay" class="text-lg font-black leading-tight"></h1>
-        <p id="clanSubtitleDisplay" class="text-xs text-slate-300"></p>
-      </div>
-    </div>
 
-    <div class="flex items-center gap-2">
-      <button id="openWarningsBtn" class="header-btn">🚨</button>
-      <button id="openNavalDefenseBtn" class="header-btn">⛵</button>
-      <button id="openRankingBtn" class="header-btn">🏆</button>
-      <button id="openHistoryBtn" class="header-btn">📜</button>
-      <button id="openSettingsBtn" class="header-btn">⚙️</button>
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="assets/images/logo.png" alt="Logo do Clã" class="w-24 h-24">
     </div>
-  </div>
-</header>
+    <h1 id="loginClanName" class="text-2xl font-black mb-2 text-center">RECRUTA ZERO《☆》</h1>
+    <p class="text-sm text-slate-400 mb-4">A vitória nos aguarda, guerreiro.</p>
+    <p id="loginError" class="login-error-message"></p>
+    <div class="relative w-full">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔑</span>
+        <input id="loginPasswordInput" type="password" placeholder="Senha de Acesso" class="input pl-9 w-full">
+    </div>
+    <button id="loginBtn" class="btn w-full mt-3">Entrar</button>
 
-  <section id="announcementArea" class="card mt-2 hidden"></section>
-  
-  <section class="card space-y-2 mb-0 rounded-b-none">
-  <div class="flex items-center justify-between gap-2 text-sm">
-      <div>📅 <b>Data:</b> <span id="dateDisplay"></span></div>
-      <div>⏰ <b>Hora:</b> <span id="timeDisplay"></span></div>
-  </div>
-    <div class="flex items-center gap-2 pt-1">
-      <div class="relative flex-1">
-        <span class="absolute left-2 top-2">🔍</span>
-        <input id="search" placeholder="Buscar jogador..." class="input pl-8">
-      </div>
-      <button id="addPlayer" class="btn">➕ Jogador</button>
-    </div>
-    <div class="total-geral-card">
-        <div class="total-geral-label">📊 Total Geral do Clã</div>
-        <div id="totalPoints" class="total-geral-value">0</div>
-    </div>
-</section>
-  
-  <section class="card mt-0 p-0 rounded-t-none">
-    <div id="tableWrapper" class="table-wrapper"></div>
-  </section>
-  
-  <footer class="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur border-t border-slate-800">
-    <div class="ticker-container">
-      <div id="ticker-text" class="ticker-text">
-      </div>
-    </div>
-  </footer>
-
-</main>
-
-<div id="rankingModal" class="modal-backdrop">
-<div class="modal-content card modal-lg">
-  <div class="flex justify-between items-center mb-4">
-      <div><h2 class="text-lg font-bold">🏆 Tabela de Ranking</h2><p class="text-xs text-slate-400">Classificação Geral (Total Acumulado)</p></div>
-      <button data-close-modal="rankingModal" class="modal-close-btn">&times;</button>
-      </div>
-    <div id="rankingTableContainer" class="table-wrapper max-h-96 overflow-y-auto">
-    <table class="w-full text-white text-sm">
-        <thead class="sticky top-0 bg-slate-800 uppercase text-xs">
-          <tr>
-            <th class="p-2 text-center">Pos.</th>
-            <th class="p-2 text-left">Jogador</th>
-            <th class="p-2 cell-numeric">Total</th>
-            <th class="p-2 cell-numeric">Média/Dia</th>
-          </tr>
-        </thead>
-        <tbody id="rankingBody"></tbody>
-        </table>
-    </div>
-
-    <div class="mt-4 pt-4 border-t border-slate-700/50">
-      <button id="shareRankingBtn" class="btn-whatsapp w-full">
-        <svg xmlns="http://www.w.org/2000/svg" class="icon" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
-        </svg>
-        <span>Compartilhar Ranking</span>
-      </button>
+    <div class="login-socials">
+        <a href="https://www.instagram.com/recrutazeroclash?igsh=MW00aTZyM20ybjdrdw==" target="_blank" class="social-icon">
+            <img src="icons/instagram.png" alt="Ícone do Instagram" class="w-12 h-12">
+        </a>
+        <a href="https://discord.gg/5FeUU9V6" target="_blank" class="social-icon">
+            <img src="icons/discord.png" alt="Ícone do Discord" class="w-12 h-12">
+        </a>
+        <a href="https://youtube.com/@recrutazeroclash?si=amHuDY1fQ3lMMtOz" target="_blank" class="social-icon">
+            <img src="icons/youtube.png" alt="Ícone do YouTube" class="w-12 h-12">
+        </a>
+        <a href="https://www.tiktok.com/@recrutazeroclash?_t=ZM-8z0ZT7jiVgD&_r=1" target="_blank" class="social-icon">
+            <img src="icons/tiktok.png" alt="Ícone do TikTok" class="w-12 h-12">
+        </a>
     </div>
   </div>
 </div>
 
+<main class="max-w-md mx-auto min-h-screen pb-20 hidden">
+    <header class="sticky top-0 z-30 backdrop-blur bg-slate-900/70">
+      <div class="flex items-center justify-between py-3 px-4">
+        <div class="flex items-center gap-2">
+          <div>
+            <h1 id="clanNameDisplay" class="text-lg font-black leading-tight"></h1>
+            <p id="clanSubtitleDisplay" class="text-xs text-slate-300"></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="openWarningsBtn" class="header-btn">🚨</button>
+          <button id="openNavalDefenseBtn" class="header-btn">⛵</button>
+          <button id="openRankingBtn" class="header-btn">🏆</button>
+          <button id="openHistoryBtn" class="header-btn">📜</button>
+          <button id="openSettingsBtn" class="header-btn">⚙️</button>
+        </div>
+      </div>
+    </header>
+
+    <section id="announcementArea" class="card mt-2 hidden"></section>
+  
+    <section class="card space-y-2 mb-0 rounded-b-none">
+        <div class="flex items-center justify-between gap-2 text-sm">
+            <div>📅 <b>Data:</b> <span id="dateDisplay"></span></div>
+            <div>⏰ <b>Hora:</b> <span id="timeDisplay"></span></div>
+        </div>
+        <div class="flex items-center gap-2 pt-1">
+            <div class="relative flex-1">
+                <span class="absolute left-2 top-2">🔍</span>
+                <input id="search" placeholder="Buscar jogador..." class="input pl-8">
+            </div>
+            <button id="addPlayer" class="btn">➕ Jogador</button>
+        </div>
+        <div class="total-geral-card">
+            <div class="total-geral-label">📊 Total Geral do Clã</div>
+            <div id="totalPoints" class="total-geral-value">0</div>
+        </div>
+    </section>
+  
+    <section class="card mt-0 p-0 rounded-t-none">
+        <div id="tableWrapper" class="table-wrapper"></div>
+    </section>
+</main>
+
+<footer class="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur border-t border-slate-800">
+    <div class="ticker-container">
+        <div id="ticker-text" class="ticker-text"></div>
+    </div>
+</footer>
+
+<div id="rankingModal" class="modal-backdrop">
+    <div class="modal-content card modal-lg">
+        <div class="flex justify-between items-center mb-4">
+            <div><h2 class="text-lg font-bold">🏆 Tabela de Ranking</h2><p class="text-xs text-slate-400">Classificação Geral (Total Acumulado)</p></div>
+            <button data-close-modal="rankingModal" class="modal-close-btn">&times;</button>
+        </div>
+        <div id="rankingTableContainer" class="table-wrapper max-h-96 overflow-y-auto">
+            <table class="w-full text-white text-sm">
+                <thead class="sticky top-0 bg-slate-800 uppercase text-xs">
+                    <tr>
+                        <th class="p-2 text-center">Pos.</th>
+                        <th class="p-2 text-left">Jogador</th>
+                        <th class="p-2 cell-numeric">Total</th>
+                        <th class="p-2 cell-numeric">Média/Dia</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingBody"></tbody>
+            </table>
+        </div>
+        <div class="mt-4 pt-4 border-t border-slate-700/50">
+            <button id="shareRankingBtn" class="btn-whatsapp w-full">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="currentColor" viewBox="0 0 16 16"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/></svg>
+                <span>Compartilhar Ranking</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="settingsModal" class="modal-backdrop">
-<div class="modal-content card modal-lg">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-lg font-bold">⚙️ Configurações</h2>
-      <button data-close-modal="settingsModal" class="modal-close-btn">&times;</button>
-    </div>
-
-    <div class="tab-container">
-      <div class="tab-nav">
-        <button class="tab-btn active" data-tab="geral">Geral</button>
-        <button class="tab-btn" data-tab="ferramentas">Ferramentas</button>
-        <button class="tab-btn" data-tab="seguranca">Segurança</button>
-      </div>
-
-      <div class="tab-content text-sm">
-        <div id="tab-geral" class="tab-panel active">
-          <div class="space-y-3">
-            <div class="border-b border-slate-700/50 pb-3 space-y-3">
-              <label class="block font-bold">Identidade do Clã</label>
-              <div class="flex items-center justify-between gap-2"><label for="clanNameInput">Nome do Clã</label><input id="clanNameInput" type="text" class="input w-48"></div>
-              <div class="flex items-center justify-between gap-2"><label for="clanSubtitleInput">Subtítulo</label><input id="clanSubtitleInput" type="text" class="input w-48"></div>
-            </div>
-            <div class="border-b border-slate-700/50 pt-3 pb-3 space-y-3">
-              <label class="block font-bold">Regras da Guerra</label>
-              <div class="flex items-center justify-between gap-2"><label for="totalDaysInput">Duração da Guerra (dias)</label><input id="totalDaysInput" type="number" min="1" max="10" class="input w-28"></div>
-              <div class="flex items-center justify-between gap-2"><label for="maxPlayersInput">Máx. Jogadores</label><input id="maxPlayersInput" type="number" min="5" max="200" class="input w-28"></div>
-            </div>
-            <div class="pt-2">
-              <label class="block font-bold">Mensagem/Aviso na Tela Inicial</label>
-              <textarea id="announcementInput" rows="3" class="input" placeholder="Ex: A guerra começa às 20h. Ataques espelhados!"></textarea>
-            </div>
-            <div class="flex items-center justify-end gap-2 mt-2"><button id="saveSettings" class="btn">💾 Salvar Tudo</button></div>
-          </div>
+    <div class="modal-content card modal-lg">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold">⚙️ Configurações</h2>
+            <button data-close-modal="settingsModal" class="modal-close-btn">&times;</button>
         </div>
-
-        <div id="tab-ferramentas" class="tab-panel">
-          <div class="space-y-4">
-            <div>
-              <label class="block mb-1 font-bold">Bloqueio de Dias</label>
-              <p class="text-xs text-slate-400 mb-2">Clique no cadeado para trancar/destrancar a edição de pontos de um dia.</p>
-              <div id="dayLockContainer" class="day-lock-container"></div>
+        <div class="tab-container">
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="geral">Geral</button>
+                <button class="tab-btn" data-tab="ferramentas">Ferramentas</button>
+                <button class="tab-btn" data-tab="seguranca">Segurança</button>
             </div>
-          </div>
+            <div class="tab-content text-sm">
+                <div id="tab-geral" class="tab-panel active">
+                    <div class="space-y-3">
+                        <div class="border-b border-slate-700/50 pb-3 space-y-3">
+                            <label class="block font-bold">Identidade do Clã</label>
+                            <div class="flex items-center justify-between gap-2"><label for="clanNameInput">Nome do Clã</label><input id="clanNameInput" type="text" class="input w-48"></div>
+                            <div class="flex items-center justify-between gap-2"><label for="clanSubtitleInput">Subtítulo</label><input id="clanSubtitleInput" type="text" class="input w-48"></div>
+                        </div>
+                        <div class="border-b border-slate-700/50 pt-3 pb-3 space-y-3">
+                            <label class="block font-bold">Regras da Guerra</label>
+                            <div class="flex items-center justify-between gap-2"><label for="totalDaysInput">Duração da Guerra (dias)</label><input id="totalDaysInput" type="number" min="1" max="10" class="input w-28"></div>
+                            <div class="flex items-center justify-between gap-2"><label for="maxPlayersInput">Máx. Jogadores</label><input id="maxPlayersInput" type="number" min="5" max="200" class="input w-28"></div>
+                        </div>
+                        <div class="pt-2">
+                            <label class="block font-bold">Mensagem/Aviso na Tela Inicial</label>
+                            <textarea id="announcementInput" rows="3" class="input" placeholder="Ex: A guerra começa às 20h. Ataques espelhados!"></textarea>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 mt-2"><button id="saveSettings" class="btn">💾 Salvar Tudo</button></div>
+                    </div>
+                </div>
+                <div id="tab-ferramentas" class="tab-panel">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block mb-1 font-bold">Controles Administrativos</label>
+                            <p class="text-xs text-slate-400 mb-3">Ative para permitir que qualquer membro edite ou remova informações. Desative para segurança máxima.</p>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                                    <label for="allowPointEditingToggle" class="font-semibold cursor-pointer">Permitir edição de pontos</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="allowPointEditingToggle">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                                    <label for="allowPlayerManagementToggle" class="font-semibold cursor-pointer">Permitir editar/excluir jogador</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="allowPlayerManagementToggle">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="border-slate-700/50">
+                        <div>
+                            <label class="block mb-1 font-bold">Bloqueio de Dias</label>
+                            <p class="text-xs text-slate-400 mb-2">Clique no cadeado para trancar/destrancar a edição de pontos de um dia.</p>
+                            <div id="dayLockContainer" class="day-lock-container"></div>
+                        </div>
+                        <hr class="border-slate-700/50">
+                        <div>
+                            <label class="block mb-1 font-bold">Exportar Dados (Excel/CSV)</label>
+                            <p class="text-xs text-slate-400 mb-2">Baixe os dados da guerra atual em um arquivo CSV, compatível com Excel.</p>
+                            <div class="space-y-2 mt-3">
+                                <button id="exportWarDataBtn" class="btn-sec w-full">📊 Exportar Dados da Guerra</button>
+                                <button id="exportNavalDataBtn" class="btn-sec w-full">⛵ Exportar Defesa Naval</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="tab-seguranca" class="tab-panel">
+                    <div class="space-y-5">
+                        <div>
+                            <label class="block font-bold mb-3">Controle de Acesso</label>
+                            <div class="space-y-4 text-sm">
+                                <div>
+                                    <p class="font-semibold">Alterar Senha de Login</p>
+                                    <p class="text-xs text-slate-400 mb-2">Altera a senha principal para acessar este painel.</p>
+                                    <div class="flex items-center gap-2">
+                                        <input id="newLoginPasswordInput" type="password" class="input" placeholder="Digite a nova senha">
+                                        <button id="saveLoginPasswordBtn" class="btn">Alterar</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="font-semibold">PIN de Administrador</p>
+                                    <p class="text-xs text-slate-400 mb-2">PIN numérico para acessar as Configurações e editar notas.</p>
+                                    <input id="adminPinInput" type="text" inputmode="numeric" class="input">
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="border-slate-700/50">
+                        <div>
+                            <label class="block font-bold mb-3">Modo de Edição Rápida</label>
+                            <div class="space-y-2 text-sm">
+                                <p class="text-xs text-slate-400 mb-2">Ative este modo para adicionar/remover advertências sem precisar digitar o PIN repetidamente.</p>
+                                <button id="toggleWarningAdminBtn" class="btn-sec w-full">🔓 Liberar Edição de Advertências</button>
+                            </div>
+                        </div>
+                        <hr class="border-slate-700/50">
+                        <div>
+                            <label class="block font-bold mb-2">Zona de Perigo</label>
+                            <div class="details-container">
+                                <details>
+                                    <summary class="summary-danger">
+                                        <span>⚠️ Ações Irreversíveis</span>
+                                        <span class="summary-icon">+</span>
+                                    </summary>
+                                    <div class="details-content">
+                                        <div class="space-y-3">
+                                            <div>
+                                                <p class="text-xs text-slate-400 mb-2">Zera a pontuação de todos os jogadores.</p>
+                                                <button id="resetPointsBtn" class="btn-danger w-full">Resetar Pontos</button>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-slate-400 mb-2">Zera as advertências de todos os jogadores (início de temporada).</p>
+                                                <button id="resetWarningsBtn" class="btn-danger w-full">Resetar Advertências</button>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-slate-400 mb-2">Zera a pontuação de defesa naval de todos os jogadores.</p>
+                                                <button id="resetNavalDefenseBtn" class="btn-danger w-full">Resetar Pontos Navais</button>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-slate-400 mb-2">Exclui permanentemente TODOS os jogadores.</p>
+                                                <button id="deleteAllPlayersBtn" class="btn-danger w-full">☠️ Excluir TODOS os Jogadores</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <div id="tab-seguranca" class="tab-panel">
-          <div class="space-y-4">
-              <div>
-                <label class="block mb-1 font-bold">PIN de Administrador</label>
-                  <p class="text-xs text-slate-400 mb-2">PIN numérico para acessar as Configurações e editar notas.</p>
-                  <input id="adminPinInput" type="text" inputmode="numeric" class="input">
-              </div>
-            <hr class="border-slate-700/50">
-            <div>
-              <p class="text-xs text-slate-400 mb-2">Ative este modo para adicionar/remover advertências sem precisar digitar o PIN repetidamente.</p>
-              <button id="toggleWarningAdminBtn" class="btn-sec w-full">🔓 Liberar Edição de Advertências</button>
-            </div>
-            <hr class="border-slate-700/50">
-            <div class="space-y-2">
-              <p class="font-bold mb-1">Zona de Perigo</p>
-              <div>
-                <p class="text-xs text-slate-400 mb-2">Zera a pontuação de todos os jogadores.</p>
-                <button id="resetPointsBtn" class="btn-danger w-full">⚠️ Resetar Pontos</button>
-              </div>
-              <div>
-                <p class="text-xs text-slate-400 mb-2">Zera as advertências de todos os jogadores (início de temporada).</p>
-                <button id="resetWarningsBtn" class="btn-danger w-full">♻️ Resetar Advertências</button>
-              </div>
-              <div>
-                <p class="text-xs text-slate-400 mb-2">Zera a pontuação de defesa naval de todos os jogadores.</p>
-                <button id="resetNavalDefenseBtn" class="btn-danger w-full">⛵ Resetar Pontos Navais</button>
-              </div>
-              <div>
-                <p class="text-xs text-slate-400 mb-2">Exclui permanentemente TODOS os jogadores.</p>
-                <button id="deleteAllPlayersBtn" class="btn-danger w-full">☠️ Excluir TODOS os Jogadores</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
     </div>
 </div>
 
 <div id="dialogModal" class="modal-backdrop modal-dialog">
-<div class="modal-content card w-full max-w-xs">
-    <h2 id="dialogTitle" class="text-lg font-bold mb-2"></h2>
-    <div id="dialogBody"></div>
-    <div id="dialogFooter" class="flex justify-end gap-2 mt-4"></div>
-  </div>
+    <div class="modal-content card w-full max-w-xs">
+        <h2 id="dialogTitle" class="text-lg font-bold mb-2"></h2>
+        <div id="dialogBody"></div>
+        <div id="dialogFooter" class="flex justify-end gap-2 mt-4"></div>
+    </div>
 </div>
 
 <div id="chartModal" class="modal-backdrop">
-<div class="modal-content card">
-    <div class="flex justify-between items-center mb-4">
-      <h2 id="chartModalTitle" class="text-lg font-bold"></h2>
-      <button data-close-modal="chartModal" class="modal-close-btn">&times;</button>
+    <div class="modal-content card">
+        <div class="flex justify-between items-center mb-4">
+            <h2 id="chartModalTitle" class="text-lg font-bold"></h2>
+            <button data-close-modal="chartModal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="playerChartCanvas"></canvas>
+        </div>
+        <div id="playerManagementArea" class="mt-4 pt-4 border-t border-slate-700/50 space-y-2"></div>
+        <div id="playerNoteDisplay" class="player-note-display" style="display: none;"></div>
     </div>
-    <div class="chart-container">
-      <canvas id="playerChartCanvas"></canvas>
-    </div>
-    <div id="playerManagementArea" class="mt-4 pt-4 border-t border-slate-700/50 space-y-2"></div>
-    <div id="playerNoteDisplay" class="player-note-display" style="display: none;"></div>
-  </div>
 </div>
 
 <div id="warningsModal" class="modal-backdrop">
@@ -212,25 +293,24 @@
             <div><h2 class="text-lg font-bold">🚨 Painel de Advertências</h2><p class="text-xs text-slate-400">Controle de membros do clã</p></div>
             <button data-close-modal="warningsModal" class="modal-close-btn">&times;</button>
         </div>
-        <div id="warningsContent" class="space-y-4 text-sm max-h-96 overflow-y-auto">
-        </div>
+        <div id="warningsContent" class="space-y-4 text-sm max-h-96 overflow-y-auto"></div>
     </div>
 </div>
 
 <div id="navalDefenseModal" class="modal-backdrop">
-  <div class="modal-content card modal-lg">
-    <div class="flex justify-between items-center mb-4">
-      <div>
-        <h2 class="text-lg font-bold">⛵ Tabela de Defesa Naval</h2>
-        <p class="text-xs text-slate-400">Pontuação dos membros na defesa do barco</p>
-      </div>
-      <div class="flex items-center gap-4">
-        <div id="navalDefenseTotal"></div>
-        <button data-close-modal="navalDefenseModal" class="modal-close-btn">&times;</button>
-      </div>
+    <div class="modal-content card modal-lg">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h2 class="text-lg font-bold">⛵ Tabela de Defesa Naval</h2>
+                <p class="text-xs text-slate-400">Pontuação dos membros na defesa do barco</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="navalDefenseTotal"></div>
+                <button data-close-modal="navalDefenseModal" class="modal-close-btn">&times;</button>
+            </div>
+        </div>
+        <div id="navalDefenseTableContainer" class="table-wrapper max-h-96 overflow-y-auto"></div>
     </div>
-    <div id="navalDefenseTableContainer" class="table-wrapper max-h-96 overflow-y-auto"></div>
-  </div>
 </div>
 
 <div id="historyModal" class="modal-backdrop">

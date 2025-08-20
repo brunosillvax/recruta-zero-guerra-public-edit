@@ -38,7 +38,10 @@ let state = {
         totalDays: 4,
         announcementMessage: '',
         lockedDays: [],
-        adminPin: '1590'
+        adminPin: '1590',
+        loginPassword: '0000',
+        allowPointEditing: false,
+        allowPlayerManagement: false
     },
     players: [],
 };
@@ -59,17 +62,24 @@ onSnapshot(settingsRef, (docSnap) => {
     if (docSnap.exists()) {
         const dbSettings = docSnap.data();
         state.settings = {
-            maxPlayers: 50, totalDays: 4, announcementMessage: '', lockedDays: [],
+            maxPlayers: 50,
+            totalDays: 4,
+            announcementMessage: '',
+            lockedDays: [],
             adminPin: '1590',
+            loginPassword: '0000',
+            allowPointEditing: false,
+            allowPlayerManagement: false,
             ...dbSettings
         };
         initSettingsInputs();
         render();
-        updateTicker(); // Chama o ticker para atualizar o nome do clã se ele mudar
+        updateTicker();
 
-        $("#clanNameDisplay").textContent = state.settings.clanName || 'RECRUTA ZERO《☆》';
+        const clanName = state.settings.clanName || 'RECRUTA ZERO《☆》';
+        $("#clanNameDisplay").textContent = clanName;
+        $("#loginClanName").textContent = clanName;
         $("#clanSubtitleDisplay").textContent = state.settings.clanSubtitle || 'Placar da Guerra Online';
-
     } else {
         setDoc(settingsRef, state.settings);
     }
@@ -97,12 +107,17 @@ onSnapshot(winnersRef, (docSnap) => {
     updateTicker();
 });
 
-
 // --- Event Listeners Globais ---
 $("#search").addEventListener("input", render);
 $("#addPlayer").addEventListener("click", addPlayer);
 $("#tableWrapper").addEventListener('click', handleTableClick);
 $("#shareRankingBtn").addEventListener("click", shareRanking);
+$("#exportWarDataBtn").addEventListener("click", handleWarDataExport);
+$("#exportNavalDataBtn").addEventListener("click", handleNavalDataExport);
+$("#loginBtn").addEventListener("click", handleLogin);
+$("#loginPasswordInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") handleLogin();
+});
 
 // --- LISTENERS PARA DEFESA NAVAL ---
 $("#openNavalDefenseBtn").addEventListener("click", openNavalDefenseModal);
@@ -128,8 +143,7 @@ $("#openSettingsBtn").addEventListener("click", async () => {
     if (pin === state.settings.adminPin) {
         captureInitialSettingsState();
         showModal("settingsModal");
-    }
-    else if (pin !== null) { showAlert({ title: 'Erro', message: 'PIN incorreto!' }); }
+    } else if (pin !== null) { showAlert({ title: 'Erro', message: 'PIN incorreto!' }); }
 });
 
 document.addEventListener('click', (e) => {
@@ -150,6 +164,7 @@ document.addEventListener('keydown', (e) => {
 
 // --- Lógica do Painel de Configuração ---
 $("#saveSettings").addEventListener("click", saveSettings);
+$("#saveLoginPasswordBtn").addEventListener("click", changeLoginPassword);
 $("#toggleWarningAdminBtn").addEventListener("click", toggleWarningAdminMode);
 $("#resetPointsBtn").addEventListener("click", resetAllPoints);
 $("#resetWarningsBtn").addEventListener("click", resetAllWarnings);
@@ -162,27 +177,76 @@ $("#dayLockContainer").addEventListener("click", (e) => {
     }
 });
 
+// --- LÓGICA DE LOGIN ---
+function checkLogin() {
+    if (sessionStorage.getItem('isLoggedIn') === 'true') {
+        $('#loginScreen').classList.add('hidden');
+        $('main').classList.remove('hidden');
+        updateTicker();
+    } else {
+        $('#loginScreen').classList.remove('hidden');
+        $('main').classList.add('hidden');
+    }
+}
+
+async function handleLogin() {
+    const passwordInput = $("#loginPasswordInput");
+    const errorMsg = $("#loginError");
+    const enteredPassword = passwordInput.value;
+    const loginBtn = $("#loginBtn");
+    const originalBtnText = loginBtn.textContent;
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Verificando...';
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    if (enteredPassword === state.settings.loginPassword) {
+        sessionStorage.setItem('isLoggedIn', 'true');
+        checkLogin();
+        errorMsg.textContent = '';
+        passwordInput.value = '';
+    } else {
+        errorMsg.textContent = 'Senha incorreta.';
+        passwordInput.value = '';
+        setTimeout(() => { errorMsg.textContent = '' }, 2000);
+    }
+
+    loginBtn.disabled = false;
+    loginBtn.textContent = originalBtnText;
+}
+
+async function changeLoginPassword() {
+    const newPassword = $("#newLoginPasswordInput").value;
+    if (!newPassword || newPassword.length < 4) {
+        return showAlert({ title: "Erro", message: "A nova senha deve ter pelo menos 4 caracteres." });
+    }
+    const confirmed = await showConfirm({
+        title: "Alterar Senha?",
+        message: "Tem certeza que deseja alterar a senha de login?",
+        confirmText: "Sim, Alterar"
+    });
+    if (confirmed) {
+        await updateDoc(settingsRef, { loginPassword: newPassword });
+        showAlert({ title: "Sucesso!", message: "A senha de login foi alterada." });
+        $("#newLoginPasswordInput").value = "";
+    }
+}
+
 // --- FUNÇÕES PRINCIPAIS ---
 function render() {
     renderTable();
     renderAnnouncement();
-
     if ($("#navalDefenseModal").classList.contains('visible')) {
         renderNavalDefenseTable();
     }
 }
 
-// COLE ESTE BLOCO NO LUGAR DO ANTIGO
 async function addPlayer() {
     if (state.players.length >= state.settings.maxPlayers) {
         return showAlert({ title: "Limite Atingido", message: "Você atingiu o número máximo de jogadores." });
     }
-    
-    // Apenas pede o nome do jogador
     const name = await showPrompt({ title: 'Adicionar Jogador', message: 'Qual o nome do novo jogador?' });
     if (!name || !name.trim()) return;
-
-    // Cria o novo jogador, já com 0 pontos por padrão
     const newPlayer = {
         name: name.trim(),
         note: '',
@@ -190,26 +254,24 @@ async function addPlayer() {
         navalDefensePoints: 0,
         dailyPoints: Array(state.settings.totalDays).fill(0)
     };
-
-    // Salva o novo jogador no Firebase
     await addDoc(playersRef, newPlayer);
 }
 
 async function handleTableClick(e) {
     const target = e.target.closest('button, [data-action="show-chart"]');
     if (!target) return;
-
     if (target.closest('.empty-row')) return;
-
     const { id, action, dayIndex } = target.dataset;
     if (!id || !action) return;
     const player = state.players.find(p => p.id === id);
     if (!player) return;
     const playerDocRef = doc(db, "players", id);
-
     if (action === 'show-chart') {
         openChartModal(player);
     } else if (action === 'edit-name') {
+        if (!state.settings.allowPlayerManagement) {
+            return showAlert({ title: "Ação Bloqueada", message: "A edição de nomes está desativada pelo administrador. Peça a um líder para liberar nas Configurações." });
+        }
         const newName = await showPrompt({ title: 'Editar Nome', message: `Qual o novo nome para ${player.name}?`, initialValue: player.name });
         if (newName !== null) {
             await updateDoc(playerDocRef, { name: newName.trim() || player.name });
@@ -225,13 +287,16 @@ async function handleTableClick(e) {
             showAlert({ title: 'Erro', message: 'PIN incorreto!' });
         }
     } else if (action === 'edit-points') {
+        const currentPoints = player.dailyPoints[dayIndex] || 0;
+        if (currentPoints > 0 && !state.settings.allowPointEditing) {
+            return showAlert({ title: "Edição Bloqueada", message: "A edição de pontos já inseridos está desativada. Peça a um líder para liberar nas Configurações." });
+        }
         const isLocked = state.settings.lockedDays && state.settings.lockedDays[dayIndex];
         if (isLocked) {
-            showAlert({ title: 'Dia Bloqueado', message: `O Dia ${parseInt(dayIndex, 10) + 1} está trancado e não pode ser editado.` });
-            return;
+            return showAlert({ title: 'Dia Bloqueado', message: `O Dia ${parseInt(dayIndex, 10) + 1} está trancado e não pode ser editado.` });
         }
         const dayNum = parseInt(dayIndex, 10) + 1;
-        const newPointsStr = await showPrompt({ title: `Editar Pontos - Dia ${dayNum}`, message: `Novos pontos para ${player.name}:`, type: 'number', initialValue: player.dailyPoints[dayIndex] });
+        const newPointsStr = await showPrompt({ title: `Editar Pontos - Dia ${dayNum}`, message: `Novos pontos para ${player.name}:`, type: 'number', initialValue: currentPoints });
         const newPoints = parseInt(newPointsStr, 10);
         if (Number.isFinite(newPoints)) {
             const updatedPoints = [...player.dailyPoints];
@@ -239,6 +304,9 @@ async function handleTableClick(e) {
             await updateDoc(playerDocRef, { dailyPoints: updatedPoints });
         }
     } else if (action === 'remove') {
+        if (!state.settings.allowPlayerManagement) {
+            return showAlert({ title: "Ação Bloqueada", message: "A exclusão de jogadores está desativada pelo administrador. Peça a um líder para liberar nas Configurações." });
+        }
         const confirmed = await showConfirm({ title: 'Remover Jogador', message: `Tem certeza que deseja remover ${player.name}?` });
         if (confirmed) {
             const row = target.closest('tr');
@@ -318,23 +386,19 @@ async function shareRanking() {
 async function renderHistoryModal() {
     const content = $("#historyContent");
     content.innerHTML = '<p class="text-center text-slate-400">Carregando histórico...</p>';
-
     try {
         const q = query(historyRef, orderBy("snapshotTimestamp", "desc"), limit(3));
         const querySnapshot = await getDocs(q);
-
         if (querySnapshot.empty) {
             content.innerHTML = '<p class="text-center text-slate-400">Nenhum histórico de guerras encontrado.</p>';
             return;
         }
-
         let historyHTML = '';
         querySnapshot.forEach(doc => {
             const data = doc.data();
             const warDate = data.snapshotTimestamp.toDate().toLocaleDateString('pt-BR', {
                 year: 'numeric', month: 'long', day: 'numeric'
             });
-
             const navalWinnerHTML = data.navalWinnerName ? `
                 <div class="history-winner">
                     <span>⛵</span>
@@ -343,7 +407,6 @@ async function renderHistoryModal() {
                         <span class="text-slate-400">- ${formatNumber(data.navalWinnerScore)} Pontos</span>
                     </div>
                 </div>` : '';
-
             historyHTML += `
                 <div class="history-entry">
                     <p class="history-date">GUERRA FINALIZADA EM: ${warDate}</p>
@@ -367,7 +430,6 @@ async function renderHistoryModal() {
     }
 }
 
-
 // --- Funções de Renderização ---
 function renderAnnouncement() {
     const area = $("#announcementArea");
@@ -386,7 +448,6 @@ function renderTable({ animateNewId = null } = {}) {
     const filtered = state.players.filter(p => p.name.toLowerCase().includes(q));
     filtered.sort((a, b) => getTotalPoints(b) - getTotalPoints(a));
     const dayHeaders = Array.from({ length: state.settings.totalDays }, (_, i) => `<th class="w-10">D${i + 1}</th>`).join("");
-
     let rowsHTML = filtered.map((p, i) => {
         const total = getTotalPoints(p);
         const dailyCells = p.dailyPoints.map((score, dayIdx) => {
@@ -399,7 +460,6 @@ function renderTable({ animateNewId = null } = {}) {
         }).join("");
         const animationClass = p.id === animateNewId ? 'row-entering' : '';
         const noteIconColor = (p.note || '').trim() ? 'icon-note-active' : '';
-
         let warningsDisplay = '';
         const warnings = p.warnings || 0;
         let rowClass = '';
@@ -411,9 +471,7 @@ function renderTable({ animateNewId = null } = {}) {
             rowClass = 'player-banned';
             warningsDisplay = '<span class="player-banned-icon">📵</span>';
         }
-        
         const topPlayerClass = (i === 0 && total > 0) ? 'top-player-row' : '';
-
         return `<tr class="${animationClass} ${rowClass} ${topPlayerClass}" data-player-id="${p.id}">
                     <td class="cell-numeric">${i + 1}</td>
                     <td class="align-left">
@@ -430,7 +488,6 @@ function renderTable({ animateNewId = null } = {}) {
                     <td><button data-id="${p.id}" data-action="remove" class="w-full h-full flex items-center justify-center">${ICONS.remove}</button></td>
                 </tr>`;
     }).join("");
-
     const emptyRowsCount = MIN_ROWS_DISPLAY - filtered.length;
     if (emptyRowsCount > 0) {
         let emptyRowsToAdd = '';
@@ -455,7 +512,6 @@ function renderTable({ animateNewId = null } = {}) {
         }
         rowsHTML += emptyRowsToAdd;
     }
-
     wrapper.innerHTML = `<table class="table"><thead><tr><th class="w-6">#</th><th>Jogador</th>${dayHeaders}<th class="w-14 col-total-header cell-total">Total</th><th class="w-10"></th></tr></thead><tbody id="player-tbody">${rowsHTML}</tbody></table>`;
     const grandTotal = state.players.reduce((sum, p) => sum + getTotalPoints(p), 0);
     $("#totalPoints").textContent = formatNumber(grandTotal);
@@ -493,7 +549,6 @@ async function saveSettings() {
     const newClanName = $("#clanNameInput").value.trim();
     const newClanSubtitle = $("#clanSubtitleInput").value.trim();
     const newAdminPin = $("#adminPinInput").value.trim() || '1590';
-
     const newSettings = {
         totalDays: newTotalDays,
         maxPlayers: newMaxPlayers,
@@ -501,9 +556,11 @@ async function saveSettings() {
         lockedDays: newLockedDays,
         clanName: newClanName,
         clanSubtitle: newClanSubtitle,
-        adminPin: newAdminPin
+        adminPin: newAdminPin,
+        allowPointEditing: $("#allowPointEditingToggle").checked,
+        allowPlayerManagement: $("#allowPlayerManagementToggle").checked,
+        loginPassword: state.settings.loginPassword
     };
-
     if (newTotalDays !== state.settings.totalDays) {
         const batch = writeBatch(db);
         state.players.forEach(p => {
@@ -514,8 +571,7 @@ async function saveSettings() {
         });
         await batch.commit();
     }
-
-    await setDoc(settingsRef, newSettings);
+    await setDoc(settingsRef, newSettings, { merge: true });
     showAlert({ title: 'Sucesso', message: 'Configurações salvas.' });
     captureInitialSettingsState();
 }
@@ -528,6 +584,8 @@ function initSettingsInputs() {
     $("#clanSubtitleInput").value = state.settings.clanSubtitle || 'Placar da Guerra Online';
     $("#adminPinInput").value = state.settings.adminPin || '1590';
     renderDayLocks();
+    $("#allowPointEditingToggle").checked = state.settings.allowPointEditing === true;
+    $("#allowPlayerManagementToggle").checked = state.settings.allowPlayerManagement === true;
 }
 
 function renderDayLocks() {
@@ -557,30 +615,23 @@ function uid() { return Math.random().toString(36).slice(2, 9); }
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
-// Substitua sua função openChartModal inteira por esta
 function openChartModal(player) {
     const chartCanvas = $("#playerChartCanvas");
     const noteDisplay = $("#playerNoteDisplay");
     const managementArea = $("#playerManagementArea");
-
     $("#chartModalTitle").textContent = `Desempenho de: ${escapeHtml(player.name)}`;
-
     const warnings = player.warnings || 0;
-    
-    // ⭐ AQUI ESTÁ A MUDANÇA NO LAYOUT ⭐
     managementArea.innerHTML = `
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <label class="font-bold text-sm">Advertências:<span class="text-xl font-black text-yellow-400 ml-2">${warnings}</span></label>
                 <button id="removeWarningBtn" class="btn-sec py-1 px-3 text-xs" ${warnings === 0 ? 'disabled' : ''}>- Remover</button>
             </div>
-
             <button id="addWarningBtn" class="btn py-1 px-3 text-xs" ${warnings >= 3 ? 'disabled' : ''}>+ Adicionar</button>
         </div>
     `;
     $("#addWarningBtn").onclick = () => updateWarnings(player.id, 1);
     $("#removeWarningBtn").onclick = () => updateWarnings(player.id, -1);
-
     if (player.note && player.note.trim() !== '') {
         noteDisplay.innerHTML = `<p class="font-bold text-slate-300">Anotação:</p><p>${escapeHtml(player.note)}</p>`;
         noteDisplay.style.display = 'block';
@@ -616,8 +667,7 @@ function openChartModal(player) {
 }
 
 function captureInitialSettingsState() {
-    const lockButtons = document.querySelectorAll('#dayLockContainer .day-lock-btn');
-    const lockedDaysState = Array.from(lockButtons).map(btn => btn.classList.contains('locked'));
+    const lockedDaysState = state.settings.lockedDays || [];
     settingsFormState.initialValues = {
         totalDays: $("#totalDaysInput").value,
         maxPlayers: $("#maxPlayersInput").value,
@@ -625,7 +675,9 @@ function captureInitialSettingsState() {
         lockedDays: JSON.stringify(lockedDaysState),
         clanName: $("#clanNameInput").value.trim(),
         clanSubtitle: $("#clanSubtitleInput").value.trim(),
-        adminPin: $("#adminPinInput").value.trim()
+        adminPin: $("#adminPinInput").value.trim(),
+        allowPointEditing: $("#allowPointEditingToggle").checked,
+        allowPlayerManagement: $("#allowPlayerManagementToggle").checked
     };
 }
 
@@ -639,7 +691,9 @@ function isSettingsFormDirty() {
         lockedDays: JSON.stringify(currentLockedDaysState),
         clanName: $("#clanNameInput").value.trim(),
         clanSubtitle: $("#clanSubtitleInput").value.trim(),
-        adminPin: $("#adminPinInput").value.trim()
+        adminPin: $("#adminPinInput").value.trim(),
+        allowPointEditing: $("#allowPointEditingToggle").checked,
+        allowPlayerManagement: $("#allowPlayerManagementToggle").checked
     };
     return JSON.stringify(currentValues) !== JSON.stringify(settingsFormState.initialValues);
 }
@@ -711,11 +765,10 @@ async function showPrompt({ title, message, initialValue = '', type = 'text' }) 
 
 async function updateWarnings(playerId, change) {
     if (!isWarningAdminMode) {
-        showAlert({
+        return showAlert({
             title: "Edição Bloqueada",
             message: "Para adicionar ou remover advertências, primeiro ative o 'Modo de Edição' nas Configurações ⚙️."
         });
-        return;
     }
     const player = state.players.find(p => p.id === playerId);
     if (!player) return;
@@ -793,14 +846,11 @@ function initializeSettingsTabs() {
     if (!tabNav) return;
     const tabBtns = $$('.tab-btn', tabNav);
     const tabPanels = $$('.tab-panel', tabNav.nextElementSibling);
-
     tabNav.addEventListener('click', (e) => {
         const clickedTab = e.target.closest('.tab-btn');
         if (!clickedTab) return;
-
         tabBtns.forEach(btn => btn.classList.remove('active'));
         clickedTab.classList.add('active');
-
         const tabId = clickedTab.dataset.tab;
         tabPanels.forEach(panel => {
             if (panel.id === `tab-${tabId}`) {
@@ -824,9 +874,7 @@ function openNavalDefenseModal() {
 function renderNavalDefenseTable() {
     const container = $("#navalDefenseTableContainer");
     const totalDisplay = $("#navalDefenseTotal");
-
     const sortedPlayers = [...state.players].sort((a, b) => (b.navalDefensePoints || 0) - (a.navalDefensePoints || 0));
-
     const totalPoints = sortedPlayers.reduce((sum, player) => sum + (player.navalDefensePoints || 0), 0);
     totalDisplay.innerHTML = `
       <div class="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2 text-center">
@@ -834,17 +882,14 @@ function renderNavalDefenseTable() {
           <span class="text-2xl font-black text-sky-400">${formatNumber(totalPoints)}</span>
       </div>
     `;
-
     if (sortedPlayers.length === 0) {
         container.innerHTML = `<p class="text-center p-4 text-slate-400">Nenhum jogador para exibir.</p>`;
         return;
     }
-
     const rowsHTML = sortedPlayers.map((p, index) => {
         const points = p.navalDefensePoints || 0;
         const status = points > 0 ? 'Realizado' : 'Pendente';
         const statusClass = points > 0 ? 'status-realizado' : 'status-pendente';
-
         return `
             <tr>
                 <td class="p-2 text-center">${index + 1}º</td>
@@ -863,7 +908,6 @@ function renderNavalDefenseTable() {
             </tr>
         `;
     }).join("");
-
     container.innerHTML = `
         <table class="w-full text-white text-sm">
             <thead class="sticky top-0 bg-slate-800 uppercase text-xs">
@@ -883,18 +927,19 @@ function renderNavalDefenseTable() {
 async function handleNavalDefenseTableClick(e) {
     const target = e.target.closest('button');
     if (!target || target.dataset.action !== 'edit-naval-points') return;
-
     const playerId = target.dataset.id;
     const player = state.players.find(p => p.id === playerId);
     if (!player) return;
-
+    const currentPoints = player.navalDefensePoints || 0;
+    if (currentPoints > 0 && !state.settings.allowPointEditing) {
+        return showAlert({ title: "Edição Bloqueada", message: "A edição de pontos está desativada pelo administrador. Fale com um líder para liberar nas Configurações." });
+    }
     const newPointsStr = await showPrompt({
         title: `Pontos Navais de ${player.name}`,
         message: 'Digite a nova pontuação:',
         type: 'number',
-        initialValue: player.navalDefensePoints || 0
+        initialValue: currentPoints
     });
-
     const newPoints = parseInt(newPointsStr, 10);
     if (Number.isFinite(newPoints)) {
         const playerDocRef = doc(db, "players", playerId);
@@ -908,7 +953,6 @@ async function resetAllNavalDefensePoints() {
         message: 'Tem certeza que deseja ZERAR a pontuação naval de TODOS os jogadores? Esta ação não pode ser desfeita.',
         confirmText: 'Sim, Zerar Tudo'
     });
-
     if (confirmed) {
         const batch = writeBatch(db);
         state.players.forEach(player => {
@@ -926,36 +970,24 @@ async function resetAllNavalDefensePoints() {
 function updateTicker() {
     const tickerElement = $("#ticker-text");
     if (!tickerElement) return;
-
-    // 1. Monta as mensagens que devem aparecer
     const messages = [];
     if (lastWarWinners.warWinnerName) {
         messages.push(`🏆 Vencedor da Guerra: ${lastWarWinners.warWinnerName} com ${formatNumber(lastWarWinners.warWinnerScore)} pontos!`);
     }
     messages.push(state.settings.clanName ? `${state.settings.clanName} — ${state.settings.clanSubtitle}` : `RECRUTA ZERO《☆》— Placar da Guerra Online`);
-
     const separator = `&nbsp;`.repeat(10) + `•` + `&nbsp;`.repeat(10);
     const uniqueContent = messages.join(separator);
-
-    // 2. Coloca o conteúdo duplicado dentro de spans para medição
     tickerElement.innerHTML = `<span>${uniqueContent}${separator}</span><span>${uniqueContent}${separator}</span>`;
-
-    // 3. Mede o tamanho exato em pixels do primeiro bloco de texto
     const contentSpan = tickerElement.querySelector('span');
     if (!contentSpan) return;
     const scrollWidth = contentSpan.offsetWidth;
-
-    // 4. Calcula uma duração de animação baseada no tamanho do texto (velocidade constante)
-    const scrollSpeed = 60; // pixels por segundo
+    const scrollSpeed = 60;
     const duration = scrollWidth / scrollSpeed;
-
-    // 5. Remove qualquer estilo de animação antigo e cria o novo dinamicamente
     const styleSheetId = 'dynamic-ticker-style';
     let styleSheet = document.getElementById(styleSheetId);
     if (styleSheet) {
         styleSheet.remove();
     }
-
     styleSheet = document.createElement('style');
     styleSheet.id = styleSheetId;
     styleSheet.innerHTML = `
@@ -965,19 +997,15 @@ function updateTicker() {
         }
     `;
     document.head.appendChild(styleSheet);
-    
-    // 6. Aplica a nova animação perfeita no elemento
     tickerElement.style.animation = `dynamicTicker ${duration.toFixed(2)}s linear infinite`;
 }
 
 async function runAutomaticSnapshot() {
     console.log("Rodando snapshot automático dos vencedores...");
-
     if (state.players.length === 0) {
         console.log("Nenhum jogador para snapshot.");
         return;
     }
-
     const sortedByWar = [...state.players].sort((a, b) => {
         const totalA = a.dailyPoints.reduce((sum, p) => sum + (p || 0), 0);
         const totalB = b.dailyPoints.reduce((sum, p) => sum + (p || 0), 0);
@@ -985,10 +1013,8 @@ async function runAutomaticSnapshot() {
     });
     const topWarPlayer = sortedByWar[0];
     const topWarScore = topWarPlayer.dailyPoints.reduce((sum, p) => sum + (p || 0), 0);
-    
     const sortedByNaval = [...state.players].sort((a, b) => (b.navalDefensePoints || 0) - (a.navalDefensePoints || 0));
     const topNavalPlayer = sortedByNaval.length > 0 ? sortedByNaval[0] : { name: 'N/A', navalDefensePoints: 0 };
-
     const winnersData = {
         warWinnerName: topWarPlayer.name,
         warWinnerScore: topWarScore,
@@ -996,8 +1022,7 @@ async function runAutomaticSnapshot() {
         navalWinnerScore: topNavalPlayer.navalDefensePoints || 0,
         snapshotTimestamp: new Date()
     };
-
-    await setDoc(winnersRef, { 
+    await setDoc(winnersRef, {
         warWinnerName: winnersData.warWinnerName,
         warWinnerScore: winnersData.warWinnerScore,
         snapshotTimestamp: winnersData.snapshotTimestamp
@@ -1008,21 +1033,16 @@ async function runAutomaticSnapshot() {
 
 async function checkAndRunAutomaticSnapshot() {
     if (isSnapshotRunning) return;
-
     const now = new Date();
     const todayIsMonday = now.getDay() === 1;
     const isAfterDeadlineTime = now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 45);
-
     if (!todayIsMonday || !isAfterDeadlineTime) {
         return;
     }
-
     const lastSnapshotDate = lastWarWinners.snapshotTimestamp ? new Date(lastWarWinners.snapshotTimestamp.seconds * 1000) : new Date(0);
-
     const lastMonday = new Date(now);
     lastMonday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
     lastMonday.setHours(6, 45, 0, 0);
-
     if (lastSnapshotDate < lastMonday) {
         isSnapshotRunning = true;
         await runAutomaticSnapshot();
@@ -1031,7 +1051,73 @@ async function checkAndRunAutomaticSnapshot() {
 }
 
 // Inicializa a aplicação
-initSettingsInputs();
-initializeSettingsTabs();
-checkAndRunAutomaticSnapshot();
-setInterval(checkAndRunAutomaticSnapshot, 1000 * 60 * 5);
+function initApp() {
+    checkLogin();
+    initSettingsInputs();
+    initializeSettingsTabs();
+    checkAndRunAutomaticSnapshot();
+    setInterval(checkAndRunAutomaticSnapshot, 1000 * 60 * 5);
+}
+initApp();
+
+// --- LÓGICA DE EXPORTAÇÃO PARA CSV ---
+
+/**
+ * Função genérica para criar e baixar um arquivo CSV.
+ * @param {string} filename - O nome do arquivo a ser baixado (ex: 'dados.csv').
+ * @param {string[][]} rows - Um array de arrays, onde cada array interno é uma linha.
+ */
+function exportToCsv(filename, rows) {
+    const csvContent = rows.map(row =>
+        row.map(item => `"${String(item || '').replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+/**
+ * Prepara e exporta os dados da Guerra de Clãs.
+ */
+function handleWarDataExport() {
+    const getTotalPoints = p => p.dailyPoints.reduce((sum, score) => sum + (score || 0), 0);
+    const sortedPlayers = [...state.players].sort((a, b) => getTotalPoints(b) - getTotalPoints(a));
+    const dayHeaders = Array.from({ length: state.settings.totalDays }, (_, i) => `Dia ${i + 1}`);
+    const headers = ['Posição', 'Nome', ...dayHeaders, 'Total Pontos', 'Advertências'];
+    const rows = sortedPlayers.map((player, index) => {
+        const total = getTotalPoints(player);
+        const dailyPoints = player.dailyPoints.map(p => p || 0);
+        return [
+            index + 1,
+            player.name,
+            ...dailyPoints,
+            total,
+            player.warnings || 0
+        ];
+    });
+    const date = new Date().toISOString().slice(0, 10);
+    exportToCsv(`guerra_cla_${date}.csv`, [headers, ...rows]);
+}
+
+/**
+ * Prepara e exporta os dados de Defesa Naval.
+ */
+function handleNavalDataExport() {
+    const sortedPlayers = [...state.players].sort((a, b) => (b.navalDefensePoints || 0) - (a.navalDefensePoints || 0));
+    const headers = ['Posição', 'Nome', 'Pontos Defesa Naval'];
+    const rows = sortedPlayers.map((player, index) => [
+        index + 1,
+        player.name,
+        player.navalDefensePoints || 0
+    ]);
+    const date = new Date().toISOString().slice(0, 10);
+    exportToCsv(`defesa_naval_${date}.csv`, [headers, ...rows]);
+}
